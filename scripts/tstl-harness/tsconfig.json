@@ -1,0 +1,16 @@
+{
+  "extends": "../../extern/tstl/test/tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noUnusedLocals": false,
+    "noEmit": true
+  },
+  "include": [
+    "./*.ts",
+    // TSTL's source uses internal `typescript` APIs (createDiagnosticReporter,
+    // pathIsAbsolute, etc.); their own tsconfig picks this up via include of
+    // src/. We override include for our setup files, so re-add this file
+    // explicitly to keep TSTL's source type-clean.
+    "../../extern/tstl/src/typescript-internal.d.ts"
+  ]
+}

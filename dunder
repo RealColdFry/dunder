@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Direct wrapper around src/main.ts so shell tab-completion treats positional
+# args as filesystem paths. Equivalent to `npm run driver -- "$@"`.
+here="$(cd "$(dirname "$0")" && pwd)"
+exec node --experimental-transform-types --no-warnings --conditions @typescript/source "$here/src/main.ts" "$@"
