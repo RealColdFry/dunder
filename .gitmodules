@@ -1,0 +1,6 @@
+[submodule "extern/typescript-go"]
+	path = extern/typescript-go
+	url = https://github.com/microsoft/typescript-go.git
+[submodule "extern/tstl"]
+	path = extern/tstl
+	url = https://github.com/TypeScriptToLua/TypeScriptToLua.git
