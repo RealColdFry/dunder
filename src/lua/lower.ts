@@ -77,8 +77,7 @@ function lowerStmt(stmt: Stmt, ctx: LowerCtx): lua.Statement[] {
 
     case "IfStatement": {
       const thenBlock = lua.createBlock(stmt.consequent.flatMap((s) => lowerStmt(s, ctx)));
-      const elseBlock =
-        stmt.alternate !== undefined ? lowerElse(stmt.alternate, ctx) : undefined;
+      const elseBlock = stmt.alternate !== undefined ? lowerElse(stmt.alternate, ctx) : undefined;
       return [lua.createIfStatement(lowerExpr(stmt.cond, ctx), thenBlock, elseBlock)];
     }
 

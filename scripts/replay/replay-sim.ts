@@ -241,15 +241,19 @@ function report(s: Stats): void {
   console.log("RPC frame counts under each policy:");
   console.log(`  naive (1 frame/call):       ${s.naive.toLocaleString()}`);
   console.log(`  memoized (dedupe):          ${s.memoSeen.size.toLocaleString()}`);
-  console.log(`  pipelined (Promise.all):    ${pipelinedTotal(s).toLocaleString()}  across ${s.batchedPerLayer.size} layer(s)`);
-  console.log(`  batched (+array overloads): ${s.batchedGroups.size.toLocaleString()}  across ${s.batchedPerLayer.size} layer(s)`);
+  console.log(
+    `  pipelined (Promise.all):    ${pipelinedTotal(s).toLocaleString()}  across ${s.batchedPerLayer.size} layer(s)`,
+  );
+  console.log(
+    `  batched (+array overloads): ${s.batchedGroups.size.toLocaleString()}  across ${s.batchedPerLayer.size} layer(s)`,
+  );
   console.log(`  memoized + batched:         ${s.memoBatchedGroups.size.toLocaleString()}`);
   console.log("");
   console.log("Per-layer breakdown:");
   const layers = [...s.batchedPerLayer.keys()].sort((a, b) => a - b);
   for (const layer of layers) {
     const bl = s.batchedPerLayer.get(layer)!;
-    const overloadable = [...bl.methods].filter(m => BATCH_OVERLOAD_METHODS.has(m));
+    const overloadable = [...bl.methods].filter((m) => BATCH_OVERLOAD_METHODS.has(m));
     console.log(
       `  L${layer}: ${bl.calls.toLocaleString()} call(s), ${bl.methods.size} distinct method(s), ${overloadable.length} with array overload`,
     );
@@ -273,7 +277,7 @@ async function main(): Promise<void> {
   const initCwd = process.env.INIT_CWD ?? process.cwd();
   const path = resolvePath(initCwd, arg);
   const stats = makeStats();
-  await streamLog(path, e => fold(stats, e));
+  await streamLog(path, (e) => fold(stats, e));
   report(stats);
 }
 

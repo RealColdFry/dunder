@@ -6,11 +6,7 @@
 // (e.g., TSTL-style visitors over typed AST) can consume `ResolvedAst`
 // without re-implementing the IPC layer.
 
-import {
-  SymbolFlags,
-  type Checker,
-  type Type,
-} from "@typescript/native-preview/async";
+import { SymbolFlags, type Checker, type Type } from "@typescript/native-preview/async";
 import {
   isBinaryExpression,
   isElementAccessExpression,

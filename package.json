@@ -9,8 +9,8 @@
   "scripts": {
     "driver": "node --experimental-transform-types --no-warnings src/main.ts",
     "compare": "node --experimental-transform-types --no-warnings scripts/compare.ts",
-    "replay-sim": "node --experimental-transform-types --no-warnings scripts/replay-sim.ts",
-    "replay-bench": "node --experimental-transform-types --no-warnings scripts/replay-bench.ts",
+    "replay-sim": "node --experimental-transform-types --no-warnings scripts/replay/replay-sim.ts",
+    "replay-bench": "node --experimental-transform-types --no-warnings scripts/replay/replay-bench.ts",
     "typecheck": "tsgo --noEmit -p .",
     "tstl-tests": "DUNDER_TEST=1 npx jest --config scripts/tstl-harness/jest.config.cjs",
     "lint": "oxlint --type-aware",

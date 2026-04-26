@@ -21,15 +21,15 @@ const CALLABLE_MAPSTO = new Set([
   "getSignaturesOfType",
   "getSignaturesOfType(Call)", // Type.getCallSignatures
   "getContextualType",
-  "getPropertiesOfType",       // Type.getProperties
+  "getPropertiesOfType", // Type.getProperties
   "getBaseTypes",
-  "Type.getBaseType",          // singular form used by Type.getBaseTypes
+  "Type.getBaseType", // singular form used by Type.getBaseTypes
   "getReturnTypeOfSignature",
   "getRestTypeOfSignature",
   "getBaseTypeOfLiteralType",
   "getConstraintOfTypeParameter",
   "getIndexInfosOfType",
-  "getTypeArguments",          // Type.typeArguments
+  "getTypeArguments", // Type.typeArguments
   "resolveName",
   "getResolvedSymbol",
   "isContextSensitive",

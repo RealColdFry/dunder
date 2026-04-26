@@ -12,8 +12,18 @@
 //     [--limit=N] [--warmup=N] [--runs=M]
 
 import { API, SignatureKind } from "@typescript/native-preview/async";
-import type { Checker, Type, Symbol as TsSymbol, Signature } from "@typescript/native-preview/async";
-import { SyntaxKind, type Expression, type Node, type SourceFile } from "@typescript/native-preview/ast";
+import type {
+  Checker,
+  Type,
+  Symbol as TsSymbol,
+  Signature,
+} from "@typescript/native-preview/async";
+import {
+  SyntaxKind,
+  type Expression,
+  type Node,
+  type SourceFile,
+} from "@typescript/native-preview/ast";
 import { createReadStream, existsSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { createRequire } from "node:module";
@@ -80,7 +90,10 @@ function memoKey(e: Entry): string {
 
 async function readEntries(path: string, limit: number): Promise<Entry[]> {
   const out: Entry[] = [];
-  const rl = createInterface({ input: createReadStream(path, { encoding: "utf8" }), crlfDelay: Infinity });
+  const rl = createInterface({
+    input: createReadStream(path, { encoding: "utf8" }),
+    crlfDelay: Infinity,
+  });
   for await (const line of rl) {
     if (line.length === 0) continue;
     out.push(JSON.parse(line) as Entry);
@@ -223,7 +236,10 @@ function resolveDeps(
 
 // Single-call dispatch keyed off the trace's `mapsTo` (the IPC-equivalent
 // method). `method` (the TSTL-side name) is used only for reporting.
-function dispatch(checker: Checker, r: ResolvedEntry): (() => Promise<unknown>) | { reason: string } {
+function dispatch(
+  checker: Checker,
+  r: ResolvedEntry,
+): (() => Promise<unknown>) | { reason: string } {
   const { entry: e, receiver, argNodes, argRefs, argScalars } = r;
   switch (e.mapsTo) {
     case "getTypeAtLocation":
@@ -281,7 +297,9 @@ function dispatch(checker: Checker, r: ResolvedEntry): (() => Promise<unknown>) 
       if (!receiver) return { reason: "no-receiver" };
       // Only valid on UnionOrIntersectionType / TemplateLiteralType.
       // Cast through unknown to a structural type that exposes getTypes.
-      const t = receiver as unknown as { getTypes?: () => Promise<readonly Type[]> };
+      const t = receiver as unknown as {
+        getTypes?: () => Promise<readonly Type[]>;
+      };
       if (typeof t.getTypes !== "function") return { reason: "no-method-on-type" };
       return () => t.getTypes!();
     }
@@ -472,7 +490,11 @@ async function runLayered(
       }
       (r as ResolvedEntry & { thunk?: () => Promise<unknown> }).thunk = d;
       if (policy === "memoized-batched") queuedKeys.add(memoKey(e));
-      if (useBatchOverloads && BATCH_OVERLOAD_METHODS.has(e.mapsTo) && e.receiverKind === "checker") {
+      if (
+        useBatchOverloads &&
+        BATCH_OVERLOAD_METHODS.has(e.mapsTo) &&
+        e.receiverKind === "checker"
+      ) {
         let arr = pendingByMethod.get(e.mapsTo);
         if (!arr) {
           arr = [];
@@ -493,21 +515,22 @@ async function runLayered(
 
     for (const [method, items] of pendingByMethod) {
       if (method === "getTypeAtLocation" || method === "getSymbolAtLocation") {
-        const nodes = items.map(it => it.resolved.argNodes[0]);
-        const call = method === "getTypeAtLocation"
-          ? checker.getTypeAtLocation(nodes)
-          : checker.getSymbolAtLocation(nodes);
+        const nodes = items.map((it) => it.resolved.argNodes[0]);
+        const call =
+          method === "getTypeAtLocation"
+            ? checker.getTypeAtLocation(nodes)
+            : checker.getSymbolAtLocation(nodes);
         const p = call.then(
-          arr => items.map((it, i) => ({ entry: it.entry, result: arr[i] })),
-          err => items.map(it => ({ entry: it.entry, error: err })),
+          (arr) => items.map((it, i) => ({ entry: it.entry, result: arr[i] })),
+          (err) => items.map((it) => ({ entry: it.entry, error: err })),
         );
         promises.push(p);
         cov.issued++;
       } else if (method === "getTypeOfSymbol") {
-        const symbols = items.map(it => it.resolved.argRefs[0] as TsSymbol);
+        const symbols = items.map((it) => it.resolved.argRefs[0] as TsSymbol);
         const p = checker.getTypeOfSymbol(symbols).then(
-          arr => items.map((it, i) => ({ entry: it.entry, result: arr[i] })),
-          err => items.map(it => ({ entry: it.entry, error: err })),
+          (arr) => items.map((it, i) => ({ entry: it.entry, result: arr[i] })),
+          (err) => items.map((it) => ({ entry: it.entry, error: err })),
         );
         promises.push(p);
         cov.issued++;
@@ -518,10 +541,12 @@ async function runLayered(
 
     for (const it of pendingSequential) {
       const thunk = (it.resolved as ResolvedEntry & { thunk: () => Promise<unknown> }).thunk;
-      promises.push(thunk().then(
-        result => [{ entry: it.entry, result }],
-        err => [{ entry: it.entry, error: err }],
-      ));
+      promises.push(
+        thunk().then(
+          (result) => [{ entry: it.entry, result }],
+          (err) => [{ entry: it.entry, error: err }],
+        ),
+      );
       cov.issued++;
     }
 
@@ -559,14 +584,16 @@ interface Args {
 
 function parseArgs(argv: string[]): Args {
   const get = (name: string): string | undefined => {
-    const a = argv.find(x => x.startsWith(`--${name}=`));
+    const a = argv.find((x) => x.startsWith(`--${name}=`));
     return a ? a.slice(name.length + 3) : undefined;
   };
   const trace = get("trace");
   const project = get("project");
   const policyRaw = get("policy") ?? "naive";
   if (!trace || !project) {
-    console.error("usage: replay-bench --trace=<log.jsonl> --project=<tsconfig.json> [--policy=...] [--limit=N] [--warmup=N] [--runs=M]");
+    console.error(
+      "usage: replay-bench --trace=<log.jsonl> --project=<tsconfig.json> [--policy=...] [--limit=N] [--warmup=N] [--runs=M]",
+    );
     process.exit(2);
   }
   const policy = policyRaw as Policy;
@@ -610,7 +637,10 @@ async function main(): Promise<void> {
   console.error(`  distinct source files in trace: ${files.size}`);
 
   console.error("Booting tsgo...");
-  const api = new API({ tsserverPath: resolveTsgoBin(), cwd: dirname(args.project) });
+  const api = new API({
+    tsserverPath: resolveTsgoBin(),
+    cwd: dirname(args.project),
+  });
   try {
     const snapshot = await api.updateSnapshot({ openProject: args.project });
     const project = snapshot.getProject(args.project);
@@ -619,7 +649,7 @@ async function main(): Promise<void> {
     await project.program.getSemanticDiagnostics();
 
     console.error("Building node lookup...");
-    const nodeLookup = await buildNodeLookup(files, p => project.program.getSourceFile(p));
+    const nodeLookup = await buildNodeLookup(files, (p) => project.program.getSourceFile(p));
     console.error(`  ${nodeLookup.size.toLocaleString()} nodes indexed`);
 
     const runOnce = async (): Promise<RunResult> => {
@@ -639,7 +669,14 @@ async function main(): Promise<void> {
           await runLayered(entries, layerBySeq, project.checker, nodeLookup, cov, "batched");
           break;
         case "memoized-batched":
-          await runLayered(entries, layerBySeq, project.checker, nodeLookup, cov, "memoized-batched");
+          await runLayered(
+            entries,
+            layerBySeq,
+            project.checker,
+            nodeLookup,
+            cov,
+            "memoized-batched",
+          );
           break;
       }
       const ms = performance.now() - t0;
@@ -648,7 +685,9 @@ async function main(): Promise<void> {
         ms,
         attempted: cov.attempted,
         issued: cov.issued,
-        skipped: [...cov.skipReasons.entries()].sort((a, b) => b[1] - a[1]).map(([reason, count]) => ({ reason, count })),
+        skipped: [...cov.skipReasons.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([reason, count]) => ({ reason, count })),
       };
     };
 
@@ -663,7 +702,7 @@ async function main(): Promise<void> {
       results.push(await runOnce());
     }
 
-    const ms = results.map(r => r.ms).sort((a, b) => a - b);
+    const ms = results.map((r) => r.ms).sort((a, b) => a - b);
     const median = ms[Math.floor(ms.length / 2)];
     const last = results[results.length - 1];
 
@@ -671,7 +710,7 @@ async function main(): Promise<void> {
     console.log(`policy:    ${args.policy}`);
     console.log(`runs:      ${results.length} (warmup ${args.warmup})`);
     console.log(`median ms: ${median.toFixed(2)}`);
-    console.log(`all ms:    ${ms.map(m => m.toFixed(2)).join(", ")}`);
+    console.log(`all ms:    ${ms.map((m) => m.toFixed(2)).join(", ")}`);
     console.log(`attempted: ${last.attempted.toLocaleString()}`);
     console.log(`issued:    ${last.issued.toLocaleString()}`);
     if (last.skipped.length > 0) {
