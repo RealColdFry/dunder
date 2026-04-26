@@ -1,0 +1,591 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cases/basic > basic/arith.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/arith.ts > ir 1`] = `
+"(Module
+  [
+    (VarDecl :kind const :name sub :init (Arith :op - 5 3))
+    (VarDecl :kind const :name mul :init (Arith :op * 4 2))
+    (VarDecl :kind const :name div :init (Arith :op / 10 4))
+    (VarDecl :kind const :name mod :init (Arith :op % 7 3))
+    (VarDecl :kind const :name pow :init (Arith :op ** 2 8))
+    (VarDecl :kind const :name neg :init (Unary :op - 5))
+    (VarDecl :kind const :name parens :init (Arith :op * (es.NumericAdd 1 2) 3))
+    (VarDecl :kind const :name lt :init (Cmp :op < 3 5))
+    (VarDecl :kind const :name gt :init (Cmp :op > 10 5))
+    (VarDecl :kind const :name le :init (Cmp :op <= 4 4))
+    (VarDecl :kind const :name ge :init (Cmp :op >= 5 6))
+  ])"
+`;
+
+exports[`cases/basic > basic/arith.ts > lua 1`] = `
+"local ____exports = {}
+local sub = 5 - 3
+local mul = 4 * 2
+local div = 10 / 4
+local mod = 7 % 3
+local pow = 2 ^ 8
+local neg = -5
+local parens = (1 + 2) * 3
+local lt = 3 < 5
+local gt = 10 > 5
+local le = 4 <= 4
+local ge = 5 >= 6
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/array-len.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/array-len.ts > ir 1`] = `
+"(Module
+  [
+    (VarDecl :kind const :name arr :init (ArrayLit [1 2 3]))
+    (VarDecl :kind const :name n :init (es.ArrayLength arr))
+  ])"
+`;
+
+exports[`cases/basic > basic/array-len.ts > lua 1`] = `
+"local ____exports = {}
+local arr = {1, 2, 3}
+local n = #arr
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/bool.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/bool.ts > ir 1`] = `
+"(Module
+  [
+    (VarDecl :kind const :name a :init true)
+    (VarDecl :kind const :name b :init false)
+  ])"
+`;
+
+exports[`cases/basic > basic/bool.ts > lua 1`] = `
+"local ____exports = {}
+local a = true
+local b = false
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/breakcontinue.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/breakcontinue.ts > ir 1`] = `
+"(Module
+  [
+    (FunDecl
+      :name findFirstEven
+      :params [n]
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (Loop
+                :body [
+                        (If
+                          :cond (es.LogicalNot (es.Truthy (Cmp :op < i n)))
+                          :then [(Break)])
+                        (If
+                          :cond (es.Truthy (es.Equality :strict true i 0))
+                          :then [(Continue)])
+                        (If
+                          :cond (es.Truthy
+                                  (es.Equality :strict true (Arith :op % i 2) 0))
+                          :then [(Return i)])
+                        (If :cond (es.Truthy (Cmp :op > i 100)) :then [(Break)])
+                      ]
+                :update [(Assign :target i :value (es.NumericAdd i 1))])
+              (Return (Unary :op - 1))
+            ])
+    (VarDecl :kind let :name %call_arg_0 :init print)
+    (ExprStmt
+      (Call :callee %call_arg_0 :args [(Call :callee findFirstEven :args [20])]))
+  ])"
+`;
+
+exports[`cases/basic > basic/breakcontinue.ts > lua 1`] = `
+"local ____exports = {}
+local function findFirstEven(n)
+    local i = 0
+    while true do
+        if not (i < n) then
+            break
+        end
+        if i == 0 then
+            goto ____continue_0
+        end
+        if i % 2 == 0 then
+            return i
+        end
+        if i > 100 then
+            break
+        end
+        ::____continue_0::
+        i = i + 1
+    end
+    return -1
+end
+local ____call_arg_0 = print
+____call_arg_0(findFirstEven(20))
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/call.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/call.ts > ir 1`] = `
+"(Module
+  [
+    (FunDecl :name add :params [a b] :body [(Return (es.NumericAdd a b))])
+    (VarDecl :kind const :name x :init (Call :callee add :args [1 2]))
+  ])"
+`;
+
+exports[`cases/basic > basic/call.ts > lua 1`] = `
+"local ____exports = {}
+local function add(a, b)
+    return a + b
+end
+local x = add(1, 2)
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/closure-counter.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/closure-counter.ts > ir 1`] = `
+"(Module
+  [
+    (FunDecl
+      :name makeCounter
+      :params []
+      :body [
+              (VarDecl :kind let :name count :init 0)
+              (Return
+                (ArrowFun
+                  :params []
+                  :body [
+                          (Assign :target count :value (es.NumericAdd count 1))
+                          (Return count)
+                        ]))
+            ])
+    (VarDecl :kind const :name inc :init (Call :callee makeCounter :args []))
+    (ExprStmt (Call :callee inc :args []))
+    (ExprStmt (Call :callee inc :args []))
+  ])"
+`;
+
+exports[`cases/basic > basic/closure-counter.ts > lua 1`] = `
+"local ____exports = {}
+local function makeCounter()
+    local count = 0
+    return function()
+        count = count + 1
+        return count
+    end
+end
+local inc = makeCounter()
+inc()
+inc()
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/closure-update-capture.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/closure-update-capture.ts > ir 1`] = `
+"(Module
+  [
+    (VarDecl :kind const :name fns :init (ArrayLit []))
+    (VarDecl :kind let :name i :init 0)
+    (Loop
+      :body [
+              (VarDecl :kind let :name %i_inner_0 :init i)
+              (If
+                :cond (es.LogicalNot (es.Truthy (Cmp :op < %i_inner_0 3)))
+                :then [(Assign :target i :value %i_inner_0) (Break)])
+              (Assign
+                :target (es.Index :array fns :index (es.ArrayLength fns))
+                :value (ArrowFun :params [] :body [(Return %i_inner_0)]))
+            ]
+      :update [
+                (Assign :target i :value %i_inner_0)
+                (Assign :target i :value (es.NumericAdd i 1))
+              ])
+    (VarDecl :kind let :name %call_arg_1 :init print)
+    (ExprStmt
+      (Call
+        :callee %call_arg_1
+        :args [(Call :callee (es.Index :array fns :index 0) :args [])]))
+    (VarDecl :kind let :name %call_arg_2 :init print)
+    (ExprStmt
+      (Call
+        :callee %call_arg_2
+        :args [(Call :callee (es.Index :array fns :index 1) :args [])]))
+    (VarDecl :kind let :name %call_arg_3 :init print)
+    (ExprStmt
+      (Call
+        :callee %call_arg_3
+        :args [(Call :callee (es.Index :array fns :index 2) :args [])]))
+  ])"
+`;
+
+exports[`cases/basic > basic/closure-update-capture.ts > lua 1`] = `
+"local ____exports = {}
+local fns = {}
+local i = 0
+while true do
+    local ____i_inner_0 = i
+    if not (____i_inner_0 < 3) then
+        i = ____i_inner_0
+        break
+    end
+    fns[#fns + 1] = function()
+        return ____i_inner_0
+    end
+    ::____continue_0::
+    i = ____i_inner_0
+    i = i + 1
+end
+local ____call_arg_1 = print
+____call_arg_1(fns[1]())
+local ____call_arg_2 = print
+____call_arg_2(fns[2]())
+local ____call_arg_3 = print
+____call_arg_3(fns[3]())
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/decl.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/decl.ts > ir 1`] = `
+"(Module
+  [
+    (VarDecl :kind const :name a :init 1)
+    (VarDecl :kind const :name b :init 2)
+    (VarDecl :kind const :name s :init "x")
+    (VarDecl :kind const :name c :init (es.NumericAdd a b))
+    (VarDecl :kind const :name t :init (es.StringConcat s s))
+  ])"
+`;
+
+exports[`cases/basic > basic/decl.ts > lua 1`] = `
+"local ____exports = {}
+local a = 1
+local b = 2
+local s = "x"
+local c = a + b
+local t = s .. s
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/destruct.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/destruct.ts > ir 1`] = `
+"(Module
+  [
+    (VarDecl :kind const :name arr :init (ArrayLit [1 2 3]))
+    (Destructure
+      :kind const
+      :pattern (ArrPat [(ArrPatElem :name a) (ArrPatElem :name b)])
+      :init arr)
+    (Destructure
+      :kind const
+      :pattern (ArrPat [(ArrPatElem :name c) (ArrPatElem :name d)])
+      :init (ArrayLit [10 20]))
+  ])"
+`;
+
+exports[`cases/basic > basic/destruct.ts > lua 1`] = `
+"local ____exports = {}
+local arr = {1, 2, 3}
+local a, b = unpack(arr, 1, 2)
+local c, d = 10, 20
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/destructinc.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/destructinc.ts > ir 1`] = `
+"(Module
+  [
+    (VarDecl :kind const :name arr :init (ArrayLit [1 2]))
+    (VarDecl :kind let :name i :init 0)
+    (VarDecl :kind let :name %arr_index_0 :init (es.Index :array arr :index i))
+    (Assign :target i :value (es.NumericAdd i 1))
+    (Destructure
+      :kind let
+      :pattern (ArrPat [(ArrPatElem :name v1) (ArrPatElem :name v2)])
+      :init (ArrayLit [%arr_index_0 (es.Index :array arr :index i)]))
+    (VarDecl :kind let :name %arr_index_1 :init (es.Index :array arr :index i))
+    (Assign :target i :value (Arith :op - i 1))
+    (Destructure
+      :kind let
+      :pattern (ArrPat [(ArrPatElem :name v3) (ArrPatElem :name v4)])
+      :init (ArrayLit [%arr_index_1 (es.Index :array arr :index i)]))
+    (VarDecl
+      :kind const
+      :name sum
+      :init (es.NumericAdd (es.NumericAdd (es.NumericAdd v1 v2) v3) v4))
+  ])"
+`;
+
+exports[`cases/basic > basic/destructinc.ts > lua 1`] = `
+"local ____exports = {}
+local arr = {1, 2}
+local i = 0
+local ____arr_index_0 = arr[i + 1]
+i = i + 1
+local v1, v2 = ____arr_index_0, arr[i + 1]
+local ____arr_index_1 = arr[i + 1]
+i = i - 1
+local v3, v4 = ____arr_index_1, arr[i + 1]
+local sum = v1 + v2 + v3 + v4
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/foobar.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/foobar.ts > ir 1`] = `
+"(Module
+  [
+    (FunDecl :name hello :params [a b] :body [(Return (es.StringConcat a b))])
+    (VarDecl :kind const :name a :init (Call :callee hello :args [1 "b"]))
+    (VarDecl :kind const :name b :init (Call :callee hello :args ["a" "b"]))
+  ])"
+`;
+
+exports[`cases/basic > basic/foobar.ts > lua 1`] = `
+"local ____exports = {}
+local function hello(a, b)
+    return a .. b
+end
+local a = hello(1, "b")
+local b = hello("a", "b")
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/forloop.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/forloop.ts > ir 1`] = `
+"(Module
+  [
+    (FunDecl
+      :name sumTo
+      :params [n]
+      :body [
+              (VarDecl :kind let :name total :init 0)
+              (VarDecl :kind let :name i :init 0)
+              (Loop
+                :body [
+                        (If
+                          :cond (es.LogicalNot (es.Truthy (Cmp :op < i n)))
+                          :then [(Break)])
+                        (Assign :target total :value (es.NumericAdd total i))
+                      ]
+                :update [(Assign :target i :value (es.NumericAdd i 1))])
+              (Return total)
+            ])
+  ])"
+`;
+
+exports[`cases/basic > basic/forloop.ts > lua 1`] = `
+"local ____exports = {}
+local function sumTo(n)
+    local total = 0
+    local i = 0
+    while true do
+        if not (i < n) then
+            break
+        end
+        total = total + i
+        ::____continue_0::
+        i = i + 1
+    end
+    return total
+end
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/ifelse.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/ifelse.ts > ir 1`] = `
+"(Module
+  [
+    (FunDecl
+      :exported true
+      :name classify
+      :params [input]
+      :body [
+              (If
+                :cond (es.Truthy (es.Equality :strict true input 0))
+                :then [(Return 0)]
+                :else [
+                        (If
+                          :cond (es.Truthy (es.Equality :strict true input 1))
+                          :then [(Return 1)]
+                          :else [
+                                  (If
+                                    :cond (es.Truthy
+                                            (es.Equality :strict true input 2))
+                                    :then [(Return 2)]
+                                    :else [(Return 3)])
+                                ])
+                      ])
+            ])
+  ])"
+`;
+
+exports[`cases/basic > basic/ifelse.ts > lua 1`] = `
+"local ____exports = {}
+function ____exports.classify(input)
+    if input == 0 then
+        return 0
+    elseif input == 1 then
+        return 1
+    elseif input == 2 then
+        return 2
+    else
+        return 3
+    end
+end
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/index.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/index.ts > ir 1`] = `
+"(Module
+  [
+    (VarDecl :kind const :name arr :init (ArrayLit [10 20 30]))
+    (VarDecl :kind const :name first :init (es.Index :array arr :index 0))
+    (VarDecl :kind const :name second :init (es.Index :array arr :index 1))
+    (VarDecl :kind const :name i :init 2)
+    (VarDecl :kind const :name third :init (es.Index :array arr :index i))
+  ])"
+`;
+
+exports[`cases/basic > basic/index.ts > lua 1`] = `
+"local ____exports = {}
+local arr = {10, 20, 30}
+local first = arr[1]
+local second = arr[2]
+local i = 2
+local third = arr[i + 1]
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/main.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/main.ts > ir 1`] = `"(Module [(VarDecl :kind const :name a :init 1)])"`;
+
+exports[`cases/basic > basic/main.ts > lua 1`] = `
+"local ____exports = {}
+local a = 1
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/plus.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/plus.ts > ir 1`] = `
+"(Module
+  [
+    (FunDecl
+      :exported true
+      :name addNumbers
+      :params [a b]
+      :body [(Return (es.NumericAdd a b))])
+    (FunDecl
+      :exported true
+      :name concatStrings
+      :params [a b]
+      :body [(Return (es.StringConcat a b))])
+  ])"
+`;
+
+exports[`cases/basic > basic/plus.ts > lua 1`] = `
+"local ____exports = {}
+function ____exports.addNumbers(a, b)
+    return a + b
+end
+function ____exports.concatStrings(a, b)
+    return a .. b
+end
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/truthy.ts > diagnostics 1`] = `[]`;
+
+exports[`cases/basic > basic/truthy.ts > ir 1`] = `
+"(Module
+  [
+    (FunDecl
+      :name check
+      :params [x s]
+      :body [
+              (If :cond (es.Truthy x) :then [(Return s)])
+              (Return
+                (es.Conditional
+                  :cond (es.Truthy (es.LogicalNot (es.Truthy s)))
+                  :then "empty"
+                  :else "ok"))
+            ])
+  ])"
+`;
+
+exports[`cases/basic > basic/truthy.ts > lua 1`] = `
+"local ____exports = {}
+local function check(x, s)
+    if x then
+        return s
+    end
+    return (function()
+        if not s then
+            return "empty"
+        else
+            return "ok"
+        end
+    end)()
+end
+return ____exports
+"
+`;
+
+exports[`cases/basic > basic/weird.ts > diagnostics 1`] = `
+[
+  "This comparison appears to be unintentional because the types 'number' and 'string' have no overlap.",
+  "This comparison appears to be unintentional because the types 'number' and 'string' have no overlap.",
+]
+`;
+
+exports[`cases/basic > basic/weird.ts > ir 1`] = `
+"(Module
+  [
+    (VarDecl :kind const :name n :init 1)
+    (VarDecl :kind const :name s :init "1")
+    (VarDecl :kind const :name agree :init (es.Equality :strict true n s))
+    (VarDecl :kind const :name disagree :init (es.Equality n s))
+  ])"
+`;
+
+exports[`cases/basic > basic/weird.ts > lua 1`] = `
+"local ____exports = {}
+local n = 1
+local s = "1"
+local agree = n == s
+local disagree = n == s
+return ____exports
+"
+`;

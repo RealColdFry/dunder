@@ -1,9 +1,6 @@
-// Real-IPC benchmark harness for instrumented TSTL checker logs.
-//
-// Boots tsgo via the dunder client, walks the source files referenced in the
-// trace, then replays the log against the live checker under one of four
-// batching policies. Reports wall-clock per policy plus coverage (how many
-// calls were actually issued vs. skipped).
+// Real-IPC benchmark harness. Boots tsgo, walks source files referenced in
+// the trace, replays the log against the live checker under one of several
+// batching policies, and reports wall-clock + coverage.
 //
 // Usage:
 //   npm run replay-bench -- \
@@ -24,9 +21,9 @@ import {
   type Node,
   type SourceFile,
 } from "@typescript/native-preview/ast";
+import { resolveTsgoBin } from "../../src/tsgo-bin.ts";
 import { createReadStream, existsSync } from "node:fs";
 import { createInterface } from "node:readline";
-import { createRequire } from "node:module";
 import { dirname, resolve as resolvePath } from "node:path";
 import { isCallable } from "./replay-shared.ts";
 
@@ -132,16 +129,6 @@ function computeLayers(entries: Entry[]): Map<number, number> {
   return layerBySeq;
 }
 
-function resolveTsgoBin(): string {
-  const require_ = createRequire(import.meta.url);
-  const platformPkg = `@typescript/native-preview-${process.platform}-${process.arch}`;
-  const pkgJson = require_.resolve(`${platformPkg}/package.json`);
-  return resolvePath(dirname(pkgJson), "lib", process.platform === "win32" ? "tsgo.exe" : "tsgo");
-}
-
-// node lookup key: `${file}:${pos}:${end}:${kindNumeric}`. The trace records
-// kinds as the marker name (e.g. "FirstStatement"), but SyntaxKind[name]
-// resolves to the numeric value either way.
 function nodeKey(file: string, pos: number, end: number, kind: number): string {
   return `${file}:${pos}:${end}:${kind}`;
 }
@@ -234,8 +221,7 @@ function resolveDeps(
   return { entry: e, layer: 0, receiver, argRefs, argScalars, argNodes };
 }
 
-// Single-call dispatch keyed off the trace's `mapsTo` (the IPC-equivalent
-// method). `method` (the TSTL-side name) is used only for reporting.
+// Single-call dispatch keyed off the trace's `mapsTo` (IPC method name).
 function dispatch(
   checker: Checker,
   r: ResolvedEntry,

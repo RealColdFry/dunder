@@ -1,5 +1,5 @@
-// Oracle diff harness. Runs a TS file through both TSTL (reference) and
-// dunder, prints both outputs, flags match/mismatch.
+// Oracle diff: runs a TS file through `typescript-to-lua` and dunder, prints
+// both outputs, flags match/mismatch.
 //
 // Usage: npm run compare -- <file.ts>
 
@@ -35,26 +35,24 @@ function findTsconfig(fromFile: string): string {
   }
 }
 
-// TSTL side: transpileProject with the same tsconfig dunder uses.
 const tsconfigPath = findTsconfig(targetFile);
 const captured: Record<string, string> = {};
-const tstlEmit = transpileProject(
+const oracleEmit = transpileProject(
   tsconfigPath,
   { noHeader: true, noEmit: false, noImplicitSelf: true },
   (fileName, data) => {
     captured[fileName] = data;
   },
 );
-const tstlDiagnostics = tstlEmit.diagnostics.map((d) =>
+const oracleDiagnostics = oracleEmit.diagnostics.map((d) =>
   typeof d.messageText === "string" ? d.messageText : d.messageText.messageText,
 );
 
-// TSTL emits e.g. src/decl.ts → <outDir>/decl.lua. Find the one matching our target.
 const targetBase = basename(targetFile, ".ts");
-const tstlKey = Object.keys(captured).find((k) => basename(k, ".lua") === targetBase);
-const tstlLua = tstlKey ? captured[tstlKey]! : "";
+const oracleKey = Object.keys(captured).find((k) => basename(k, ".lua") === targetBase);
+const oracleLua = oracleKey ? captured[oracleKey]! : "";
 
-const dunder = spawnSync("npm", ["run", "driver", "--silent", "--", "--emit", targetFile], {
+const dunder = spawnSync("npm", ["run", "dunder", "--silent", "--", "--emit", targetFile], {
   cwd: repoRoot,
   encoding: "utf8",
 });
@@ -67,28 +65,28 @@ const dunderDiagnostics = dunder.stderr.split("\n").filter((l) => l.length > 0);
 
 const banner = (s: string) => `=== ${s} `.padEnd(60, "=");
 
-console.log(banner("tstl"));
-if (tstlDiagnostics.length) console.log(tstlDiagnostics.map((d) => "  ! " + d).join("\n"));
-process.stdout.write(tstlLua);
+console.log(banner("oracle"));
+if (oracleDiagnostics.length) console.log(oracleDiagnostics.map((d) => "  ! " + d).join("\n"));
+process.stdout.write(oracleLua);
 
 console.log(banner("dunder"));
 if (dunderDiagnostics.length) console.log(dunderDiagnostics.map((d) => "  ! " + d).join("\n"));
 process.stdout.write(dunderLua);
 
 console.log(banner("diff"));
-if (tstlLua === dunderLua) {
+if (oracleLua === dunderLua) {
   console.log("MATCH");
 } else {
   console.log("MISMATCH");
-  const tstlLines = tstlLua.split("\n");
+  const oracleLines = oracleLua.split("\n");
   const dunderLines = dunderLua.split("\n");
-  const n = Math.max(tstlLines.length, dunderLines.length);
+  const n = Math.max(oracleLines.length, dunderLines.length);
   for (let i = 0; i < n; i++) {
-    const a = tstlLines[i] ?? "";
+    const a = oracleLines[i] ?? "";
     const b = dunderLines[i] ?? "";
     if (a === b) continue;
     console.log(`  L${i + 1}:`);
-    console.log(`    tstl:   ${JSON.stringify(a)}`);
+    console.log(`    oracle: ${JSON.stringify(a)}`);
     console.log(`    dunder: ${JSON.stringify(b)}`);
   }
   process.exitCode = 1;

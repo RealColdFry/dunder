@@ -1,12 +1,8 @@
-// Frontend layer: owns all tsgo IPC. Produces a `ResolvedAst` that captures
-// the source file + batched type information needed downstream. All checker
-// calls happen here; downstream IR construction is pure synchronous code.
-//
-// This is the IPC/no-IPC boundary. Anyone who wants a different IR shape
-// (e.g., TSTL-style visitors over typed AST) can consume `ResolvedAst`
-// without re-implementing the IPC layer.
+// Frontend layer: owns all tsgo IPC. Produces a `ResolvedAst` with batched
+// type information. The IPC/no-IPC boundary; downstream IR construction is
+// pure synchronous code over this struct.
 
-import { SymbolFlags, type Checker, type Type } from "@typescript/native-preview/async";
+import { type Checker, type Type } from "@typescript/native-preview/async";
 import {
   isBinaryExpression,
   isElementAccessExpression,
@@ -15,51 +11,49 @@ import {
   type Node,
   type SourceFile,
 } from "@typescript/native-preview/ast";
+import { computeIsArrayLike, computeIsStringy } from "./typeshape.ts";
 
-// Re-export so consumers can stay type-only relative to tsgo IPC.
 export type { Type } from "@typescript/native-preview/async";
 
 export interface ResolvedAst {
   sourceFile: SourceFile;
-  // Type for a select set of nodes that downstream consumers need (operands
-  // of `+`, receivers of property/element access). Frontend collects these
-  // by walking the AST once before issuing the batched RPC.
+  // Populated for `+` operands and property/element-access receivers.
   typeByNode: Map<Node, Type | undefined>;
-  // Global Array / ReadonlyArray target-type ids; cached to recognize
-  // references without a per-check RPC. `undefined` if not resolvable.
-  arrayTargetId: string | undefined;
-  readonlyArrayTargetId: string | undefined;
+  isStringyByNode: Map<Node, boolean>;
+  isArrayLikeByNode: Map<Node, boolean>;
 }
 
 export async function resolve(sourceFile: SourceFile, checker: Checker): Promise<ResolvedAst> {
-  const [arraySymbol, readonlyArraySymbol] = await Promise.all([
-    checker.resolveName("Array", SymbolFlags.Type),
-    checker.resolveName("ReadonlyArray", SymbolFlags.Type),
-  ]);
-  const [arrayType, readonlyArrayType] = await Promise.all([
-    arraySymbol ? checker.getDeclaredTypeOfSymbol(arraySymbol) : undefined,
-    readonlyArraySymbol ? checker.getDeclaredTypeOfSymbol(readonlyArraySymbol) : undefined,
-  ]);
-  const arrayTargetId = arrayType?.id;
-  const readonlyArrayTargetId = readonlyArrayType?.id;
-
-  // Walk the AST collecting every node whose type a downstream consumer is
-  // likely to need. Slightly over-collects (cheap when batched).
-  const operands: Node[] = [];
+  const plusOperands: Node[] = [];
+  const accessReceivers: Node[] = [];
   const visit = (node: Node): void => {
     if (isBinaryExpression(node) && node.operatorToken.kind === SyntaxKind.PlusToken) {
-      operands.push(node.left, node.right);
+      plusOperands.push(node.left, node.right);
     }
     if (isPropertyAccessExpression(node) || isElementAccessExpression(node)) {
-      operands.push(node.expression);
+      accessReceivers.push(node.expression);
     }
     node.forEachChild(visit);
   };
   sourceFile.forEachChild(visit);
 
-  const types = operands.length === 0 ? [] : await checker.getTypeAtLocation(operands);
+  const allOperands = [...plusOperands, ...accessReceivers];
+  const types =
+    allOperands.length === 0 ? [] : await checker.getTypeAtLocation(allOperands);
   const typeByNode = new Map<Node, Type | undefined>();
-  operands.forEach((n, i) => typeByNode.set(n, types[i]));
+  allOperands.forEach((n, i) => typeByNode.set(n, types[i]));
 
-  return { sourceFile, typeByNode, arrayTargetId, readonlyArrayTargetId };
+  // Each predicate may issue its own RPCs; Promise.all pipelines them.
+  const plusTypes = plusOperands.map((n) => typeByNode.get(n));
+  const accessTypes = accessReceivers.map((n) => typeByNode.get(n));
+  const [stringyResults, arrayLikeResults] = await Promise.all([
+    Promise.all(plusTypes.map((t) => computeIsStringy(t))),
+    Promise.all(accessTypes.map((t) => computeIsArrayLike(t, checker))),
+  ]);
+  const isStringyByNode = new Map<Node, boolean>();
+  plusOperands.forEach((n, i) => isStringyByNode.set(n, stringyResults[i] ?? false));
+  const isArrayLikeByNode = new Map<Node, boolean>();
+  accessReceivers.forEach((n, i) => isArrayLikeByNode.set(n, arrayLikeResults[i] ?? false));
+
+  return { sourceFile, typeByNode, isStringyByNode, isArrayLikeByNode };
 }

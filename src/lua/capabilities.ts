@@ -1,85 +1,100 @@
-// Lua target capabilities.
-//
-// A `LuaCapabilities` value describes what the target Lua runtime provides:
-// which length operator works, where `unpack` lives, whether bitwise is
-// native, etc. The lowering pass dispatches on capability shape, never on
-// preset/version identity. This is a generalization of tslua's
-// methods-on-enum pattern: capabilities are first-class data; presets
-// (Lua54, LuaJIT, etc.) are convenience constructors.
-//
-// Adding a new capability: extend the interface, add a default to every
-// preset, dispatch in lower.ts. Adding a new preset: write the struct.
-// User overrides: spread the preset and override individual fields.
+// What the target Lua runtime provides. Lowering dispatches on capability
+// shape, never on preset/version identity. Presets are convenience
+// constructors; user overrides spread a preset and override fields.
 
 export interface LuaCapabilities {
   /**
-   * How `arr.length` (and similar array-length operations) emit.
+   * How `arr.length` emits.
    * - `native`: `#arr` (Lua 5.1+, LuaJIT, Luau).
    * - `tableGetn`: `table.getn(arr)` (Lua 5.0).
-   * - `call`: `<fn>(arr)`, a host adapter (e.g. pilaoda's `Len`).
+   * - `call`: `<fn>(arr)` host adapter.
    */
   arrayLength: { kind: "native" } | { kind: "tableGetn" } | { kind: "call"; fn: string };
 
   /**
-   * How to spread an array into multi-return values.
+   * Array → multi-return spread.
    * - `global`: `unpack(arr, 1, n)` (Lua 5.0/5.1/JIT). 5.0 ignores bounds.
    * - `table`: `table.unpack(arr, 1, n)` (Lua 5.2+/Luau).
-   * - `lualib`: `__TS__Unpack(arr)`, universal fallback, requires lualib.
+   * - `lualib`: `__TS__Unpack(arr)`, requires lualib.
    */
   unpack: { kind: "global"; supportsBounds: boolean } | { kind: "table" } | { kind: "lualib" };
+
+  /**
+   * `goto`/`::label::`. Lua 5.2+, Luau, modern LuaJIT.
+   */
+  hasGoto: boolean;
+
+  /**
+   * Native `continue` (Luau). Currently unused: it skips the loop tail,
+   * which would skip ES-required update statements.
+   */
+  hasNativeContinue: boolean;
 }
 
 // ── Presets ────────────────────────────────────────────────────────────────
-// One per supported Lua version + LuaJIT + Luau + Universal. Presets only
-// declare capabilities that exist today in `LuaCapabilities`; new
-// capabilities get defaults added across all presets in a single edit.
 
 export const Lua50: LuaCapabilities = {
   arrayLength: { kind: "tableGetn" },
   unpack: { kind: "global", supportsBounds: false },
+  hasGoto: false,
+  hasNativeContinue: false,
 };
 
 export const Lua51: LuaCapabilities = {
   arrayLength: { kind: "native" },
   unpack: { kind: "global", supportsBounds: true },
+  hasGoto: false,
+  hasNativeContinue: false,
 };
 
 export const Lua52: LuaCapabilities = {
   arrayLength: { kind: "native" },
   unpack: { kind: "table" },
+  hasGoto: true,
+  hasNativeContinue: false,
 };
 
 export const Lua53: LuaCapabilities = {
   arrayLength: { kind: "native" },
   unpack: { kind: "table" },
+  hasGoto: true,
+  hasNativeContinue: false,
 };
 
 export const Lua54: LuaCapabilities = {
   arrayLength: { kind: "native" },
   unpack: { kind: "table" },
+  hasGoto: true,
+  hasNativeContinue: false,
 };
 
 export const Lua55: LuaCapabilities = {
   arrayLength: { kind: "native" },
   unpack: { kind: "table" },
+  hasGoto: true,
+  hasNativeContinue: false,
 };
 
 export const LuaJIT: LuaCapabilities = {
   arrayLength: { kind: "native" },
   unpack: { kind: "global", supportsBounds: true },
+  hasGoto: true,
+  hasNativeContinue: false,
 };
 
 export const Luau: LuaCapabilities = {
   arrayLength: { kind: "native" },
   unpack: { kind: "table" },
+  hasGoto: true,
+  hasNativeContinue: true,
 };
 
 export const Universal: LuaCapabilities = {
-  arrayLength: { kind: "native" }, // 5.1-compatible baseline
+  arrayLength: { kind: "native" },
   unpack: { kind: "lualib" },
+  hasGoto: false,
+  hasNativeContinue: false,
 };
-
-// ── Preset lookup ──────────────────────────────────────────────────────────
 
 export const presets: Record<string, LuaCapabilities> = {
   "5.0": Lua50,

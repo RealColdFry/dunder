@@ -4,6 +4,7 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "allowImportingTsExtensions": true,
+    "customConditions": ["@typescript/source"],
     "types": ["node"],
     "strict": true,
     "noEmit": true,

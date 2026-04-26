@@ -1,3 +1,7 @@
 [submodule "extern/tstl"]
 	path = extern/tstl
 	url = https://github.com/TypeScriptToLua/TypeScriptToLua.git
+[submodule "extern/typescript-go"]
+	path = extern/typescript-go
+	url = git@github.com:RealColdFry/typescript-go.git
+	branch = coldfry/integration

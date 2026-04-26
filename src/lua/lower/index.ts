@@ -1,20 +1,27 @@
-// IR → Lua AST.
-//
-// The lowering dispatches on the target's `LuaCapabilities` for any
-// per-target decision. No preset names appear in this file; capabilities
-// are the contract. Adding a new target is one entry in capabilities.ts;
-// adding a new per-target decision is a switch on a capability shape here.
+// IR → Lua AST. The IR is ANF, so this is a near-mechanical tree-by-tree
+// translation; per-target shape choices dispatch on `LuaCapabilities`.
 
-import type { Expr, Module, Stmt } from "../ir.ts";
-import * as lua from "./ast.ts";
-import { LuaJIT, type LuaCapabilities } from "./capabilities.ts";
+import type { Expr, Module, Stmt } from "../../ir/types.ts";
+import * as lua from "../ast.ts";
+import { LuaJIT, type LuaCapabilities } from "../capabilities.ts";
 
 interface LowerCtx {
   target: LuaCapabilities;
   freshName: (prefix: string) => string;
+  // Top-of-stack is the goto label the next Continue jumps to.
+  continueLabelStack: string[];
 }
 
-// Module emit shape (matches TSTL's CommonJS-style module wrap):
+// `%` (IR temp sigil) is illegal in Lua identifiers; translate to `____`.
+function luaName(name: string): string {
+  return name.startsWith("%") ? "____" + name.slice(1) : name;
+}
+
+function luaIdent(name: string): lua.Identifier {
+  return lua.createIdentifier(luaName(name));
+}
+
+// Module emit shape:
 //   local ____exports = {}
 //   <body>           -- exported decls become assignments to ____exports
 //   return ____exports
@@ -23,6 +30,7 @@ export function lowerModule(mod: Module, target: LuaCapabilities = LuaJIT): lua.
   const ctx: LowerCtx = {
     target,
     freshName: (prefix) => `____${prefix}_${counter++}`,
+    continueLabelStack: [],
   };
 
   const exportsId = lua.createIdentifier("____exports");
@@ -41,67 +49,105 @@ function exportsFieldAccess(name: string): lua.TableIndexExpression {
   );
 }
 
-// Returns `Statement[]` because some IR statements lower to multiple Lua
-// statements (currently destructuring; later: hoisted temps, some control
-// flow synthesis). Caller flattens.
 function lowerStmt(stmt: Stmt, ctx: LowerCtx): lua.Statement[] {
   switch (stmt.kind) {
-    case "VariableDeclaration": {
-      // bindingKind is carried in IR for future backends that need per-iteration
-      // binding (let in for-loops) or for closure-capture analysis. The default
-      // Lua backend maps all three (let/const/var) to `local`.
+    case "VarDecl": {
       const init = stmt.init ? lowerExpr(stmt.init, ctx) : undefined;
       if (stmt.exported && init !== undefined) {
-        // `export const x = init;` → `____exports.x = init` (no local binding).
         return [lua.createAssignmentStatement(exportsFieldAccess(stmt.name), init)];
       }
-      // `let x;` / `var x;` (no init) → `local x` (Lua initializes to nil).
-      return [lua.createVariableDeclarationStatement(lua.createIdentifier(stmt.name), init)];
+      return [lua.createVariableDeclarationStatement(luaIdent(stmt.name), init)];
     }
 
-    case "VariableDestructuring":
+    case "Destructure":
       return lowerArrayDestructuring(stmt, ctx);
 
-    case "FunctionDeclaration": {
-      const params = stmt.params.map((p) => lua.createIdentifier(p.name));
+    case "FunDecl": {
+      const params = stmt.params.map((p) => luaIdent(p.name));
       const body = lua.createBlock(stmt.body.flatMap((s) => lowerStmt(s, ctx)));
       const fn = lua.createFunctionExpression(body, params, undefined, lua.NodeFlags.Declaration);
       if (stmt.exported) {
-        // `export function X(...) {...}` → `function ____exports.X(...) ... end`.
-        // The Lua printer detects FunctionDefinition + Declaration flag and
-        // emits the function-decl syntax instead of the assignment form.
         return [lua.createAssignmentStatement(exportsFieldAccess(stmt.name), fn)];
       }
-      return [lua.createVariableDeclarationStatement(lua.createIdentifier(stmt.name), fn)];
+      return [lua.createVariableDeclarationStatement(luaIdent(stmt.name), fn)];
     }
 
-    case "IfStatement": {
+    case "If": {
+      const cond = lowerExpr(stmt.cond, ctx);
       const thenBlock = lua.createBlock(stmt.consequent.flatMap((s) => lowerStmt(s, ctx)));
       const elseBlock = stmt.alternate !== undefined ? lowerElse(stmt.alternate, ctx) : undefined;
-      return [lua.createIfStatement(lowerExpr(stmt.cond, ctx), thenBlock, elseBlock)];
+      return [lua.createIfStatement(cond, thenBlock, elseBlock)];
     }
 
-    case "ReturnStatement":
-      return [lua.createReturnStatement(stmt.value ? [lowerExpr(stmt.value, ctx)] : [])];
+    case "Return":
+      return [
+        lua.createReturnStatement(stmt.value !== undefined ? [lowerExpr(stmt.value, ctx)] : []),
+      ];
 
-    case "ExpressionStatement":
+    case "ExprStmt":
       return [lua.createExpressionStatement(lowerExpr(stmt.expr, ctx))];
+
+    case "Assign": {
+      const target = lowerExpr(stmt.target, ctx) as lua.AssignmentLeftHandSideExpression;
+      const value = lowerExpr(stmt.value, ctx);
+      return [lua.createAssignmentStatement(target, value)];
+    }
+
+    case "Loop":
+      return lowerLoop(stmt, ctx);
+
+    case "Break":
+      return [lua.createBreakStatement()];
+
+    case "Continue": {
+      const label = ctx.continueLabelStack[ctx.continueLabelStack.length - 1];
+      if (label === undefined) throw new Error("Continue outside Loop");
+      return [lua.createGotoStatement(label)];
+    }
   }
 }
 
+// Loop emit (hasGoto path):
+//
+//   while true do
+//     <body>
+//     ::__continue_N::
+//     <update>
+//   end
+//
+// Sentinel-form fallback for non-goto targets (Lua 5.0/5.1/Universal) is
+// not implemented yet.
+function lowerLoop(stmt: Stmt & { kind: "Loop" }, ctx: LowerCtx): lua.Statement[] {
+  if (!ctx.target.hasGoto) {
+    throw new Error(
+      "Loop with goto-based continue requires `hasGoto` capability; sentinel fallback for Lua 5.0/5.1/Universal is not implemented yet",
+    );
+  }
+  const label = ctx.freshName("continue");
+  ctx.continueLabelStack.push(label);
+  const bodyStmts: lua.Statement[] = [];
+  for (const s of stmt.body) bodyStmts.push(...lowerStmt(s, ctx));
+  bodyStmts.push(lua.createLabelStatement(label));
+  if (stmt.update) {
+    for (const s of stmt.update) bodyStmts.push(...lowerStmt(s, ctx));
+  }
+  ctx.continueLabelStack.pop();
+  return [
+    lua.createWhileStatement(lua.createBlock(bodyStmts), lua.createBooleanLiteral(true)),
+  ];
+}
+
 function lowerArrayDestructuring(
-  stmt: Stmt & { kind: "VariableDestructuring" },
+  stmt: Stmt & { kind: "Destructure" },
   ctx: LowerCtx,
 ): lua.Statement[] {
-  const lefts = stmt.pattern.elements.map((el) => lua.createIdentifier(el.name));
+  const lefts = stmt.pattern.elements.map((el) => luaIdent(el.name));
   const count = stmt.pattern.elements.length;
 
-  // Optimization: literal source → inline multi-assign. Target-independent
-  // because Lua's `local a, b = e1, e2` works on every version.
-  if (stmt.init.kind === "ArrayLiteralExpression") {
+  // Literal source → inline multi-assign (works on every Lua version).
+  if (stmt.init.kind === "ArrayLit") {
     const rights = stmt.init.elements.map((e) => lowerExpr(e, ctx));
     if (stmt.exported) {
-      // `export const [a, b] = [1, 2]` → `____exports.a, ____exports.b = 1, 2`
       return [
         lua.createAssignmentStatement(
           stmt.pattern.elements.map((el) => exportsFieldAccess(el.name)),
@@ -112,7 +158,6 @@ function lowerArrayDestructuring(
     return [lua.createVariableDeclarationStatement(lefts, rights)];
   }
 
-  // Non-literal source: dispatch on target's unpack capability.
   const sourceExpr = lowerExpr(stmt.init, ctx);
   const unpackCall = unpackExpression(ctx.target, sourceExpr, count);
 
@@ -153,16 +198,14 @@ function unpackExpression(
   }
 }
 
-// Lua's IfStatement recursively nests elseif: `elseBlock?: Block | IfStatement`.
-// If our else is exactly one `if` statement AND it lowers to exactly one Lua
-// IfStatement, emit as `elseif` by passing the nested IfStatement directly.
-// Otherwise emit as `else` block.
+// Else-of-one-If lowers to `elseif` by passing the nested IfStatement directly.
 function lowerElse(stmts: Stmt[], ctx: LowerCtx): lua.Block | lua.IfStatement {
-  if (stmts.length === 1 && stmts[0]!.kind === "IfStatement") {
+  if (stmts.length === 1 && stmts[0]!.kind === "If") {
     const lowered = lowerStmt(stmts[0]!, ctx);
     if (lowered.length === 1 && lua.isIfStatement(lowered[0]!)) {
       return lowered[0]!;
     }
+    return lua.createBlock(lowered);
   }
   return lua.createBlock(stmts.flatMap((s) => lowerStmt(s, ctx)));
 }
@@ -178,65 +221,86 @@ function lowerExpr(expr: Expr, ctx: LowerCtx): lua.Expression {
     case "NullLiteral":
       return lua.createNilLiteral();
     case "Identifier":
-      return lua.createIdentifier(expr.name);
-    case "Addition": {
-      const op =
-        expr.mode === "concat" ? lua.SyntaxKind.ConcatOperator : lua.SyntaxKind.AdditionOperator;
-      return lua.createBinaryExpression(lowerExpr(expr.left, ctx), lowerExpr(expr.right, ctx), op);
-    }
+      return luaIdent(expr.name);
+
+    case "es.NumericAdd":
+      return lua.createBinaryExpression(
+        lowerExpr(expr.left, ctx),
+        lowerExpr(expr.right, ctx),
+        lua.SyntaxKind.AdditionOperator,
+      );
+    case "es.StringConcat":
+      return lua.createBinaryExpression(
+        lowerExpr(expr.left, ctx),
+        lowerExpr(expr.right, ctx),
+        lua.SyntaxKind.ConcatOperator,
+      );
+
     case "Arithmetic": {
-      // DIV-MOD-001: `%` emits Lua's `%`, which has sign-of-divisor semantics
-      // (vs ES's sign-of-dividend). Faithful emit would require a runtime
-      // helper (__TS__Mod in TSTL). TSTL default accepts the divergence.
+      // DIV-MOD-001: Lua's `%` is sign-of-divisor (vs ES sign-of-dividend).
       const op = arithmeticLuaOp(expr.op);
       return lua.createBinaryExpression(lowerExpr(expr.left, ctx), lowerExpr(expr.right, ctx), op);
     }
+
     case "Comparison": {
       const op = comparisonLuaOp(expr.op);
       return lua.createBinaryExpression(lowerExpr(expr.left, ctx), lowerExpr(expr.right, ctx), op);
     }
-    case "LogicalExpression": {
-      // Lua `and`/`or` short-circuit identically to ES. Truthiness rules
-      // differ (DIV-TRUTH-001 pending). Default backend lowers directly.
+
+    case "es.LogicalExpression": {
+      // DIV-TRUTH-001: short-circuit matches; truthiness rules differ.
       const op = expr.op === "&&" ? lua.SyntaxKind.AndOperator : lua.SyntaxKind.OrOperator;
       return lua.createBinaryExpression(lowerExpr(expr.left, ctx), lowerExpr(expr.right, ctx), op);
     }
+
     case "UnaryExpression":
       return lua.createUnaryExpression(
         lowerExpr(expr.operand, ctx),
         lua.SyntaxKind.NegationOperator,
       );
-    case "Equality": {
-      // DIV-EQ-001: `strict` is ignored in tstl-compat; both ==/=== → Lua `==`.
-      const op = expr.negated ? lua.SyntaxKind.InequalityOperator : lua.SyntaxKind.EqualityOperator;
+
+    case "es.LogicalNot":
+      // DIV-TRUTH-001: Lua truthiness, not ES.
+      return lua.createUnaryExpression(
+        lowerExpr(expr.operand, ctx),
+        lua.SyntaxKind.NotOperator,
+      );
+
+    case "es.Truthy":
+      // DIV-TRUTH-001: passthrough; default backend accepts the divergence.
+      return lowerExpr(expr.expr, ctx);
+
+    case "es.Equality": {
+      // DIV-EQ-001: both ==/=== → Lua `==` (strict ignored).
+      const op = expr.negated
+        ? lua.SyntaxKind.InequalityOperator
+        : lua.SyntaxKind.EqualityOperator;
       return lua.createBinaryExpression(lowerExpr(expr.left, ctx), lowerExpr(expr.right, ctx), op);
     }
-    case "CallExpression":
+
+    case "Call":
       return lua.createCallExpression(
         lowerExpr(expr.callee, ctx),
         expr.args.map((a) => lowerExpr(a, ctx)),
       );
 
-    case "ArrayLiteralExpression": {
+    case "ArrayLit": {
       const fields = expr.elements.map((el) => lua.createTableFieldExpression(lowerExpr(el, ctx)));
       return lua.createTableExpression(fields);
     }
 
-    case "PropertyAccessExpression":
+    case "PropertyAccess":
       return lua.createTableIndexExpression(
         lowerExpr(expr.receiver, ctx),
         lua.createStringLiteral(expr.name),
       );
 
-    case "ArrayLength":
+    case "es.ArrayLength":
       return lowerArrayLength(ctx.target, lowerExpr(expr.array, ctx));
 
-    case "ConditionalExpression": {
-      // Default Lua backend emits an IIFE: always correct, ignores both the
-      // `cond and a or b` optimization (broken when `a` is falsy) and the
-      // hoisted-temp optimization (requires preceding-statements machinery).
-      // A Luau backend would emit `if cond then a else b` natively (capability
-      // not yet modeled).
+    case "es.Conditional": {
+      // IIFE: always correct. Skips the `cond and a or b` shortcut (broken
+      // when `a` is falsy) and ignores hoisted-temp / native-ternary paths.
       const body = lua.createBlock([
         lua.createIfStatement(
           lowerExpr(expr.cond, ctx),
@@ -248,26 +312,20 @@ function lowerExpr(expr: Expr, ctx: LowerCtx): lua.Expression {
       return lua.createCallExpression(fn, []);
     }
 
-    case "ArrowFunction": {
-      // Arrow functions in Lua are anonymous function expressions. `this`
-      // binding semantics differ from `function` declarations in ES, but
-      // Lua doesn't have lexical `this`/`self` capture either way; it's a
-      // future divergence to address when classes / methods land.
-      const params = expr.params.map((p) => lua.createIdentifier(p.name));
+    case "ArrowFun": {
+      const params = expr.params.map((p) => luaIdent(p.name));
       const body = lua.createBlock(expr.body.flatMap((s) => lowerStmt(s, ctx)));
       return lua.createFunctionExpression(body, params);
     }
 
-    case "ArrayIndex": {
-      // DIV-ARR-INDEX-001: ES arrays are 0-based, Lua tables are 1-based.
-      // Adjust by +1. Constant-fold when the index is a numeric literal so
-      // output matches TSTL byte-for-byte.
+    case "es.Index": {
+      // DIV-ARR-INDEX-001: 0-based → 1-based. Constant-fold numeric literals.
       const array = lowerExpr(expr.array, ctx);
       const index = lowerExpr(expr.index, ctx);
       return lua.createTableIndexExpression(array, adjustIndex(index));
     }
 
-    case "ElementAccessExpression":
+    case "ElementAccess":
       return lua.createTableIndexExpression(
         lowerExpr(expr.receiver, ctx),
         lowerExpr(expr.index, ctx),

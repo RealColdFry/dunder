@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
-# Direct wrapper around src/main.ts so shell tab-completion treats positional
-# args as filesystem paths. Equivalent to `npm run driver -- "$@"`.
-here="$(cd "$(dirname "$0")" && pwd)"
+# Direct wrapper around src/main.ts. Resolves through symlinks so it works
+# both when invoked from the repo root (./dunder) and via the npm bin
+# symlink at node_modules/.bin/dunder.
+set -e
+script="$0"
+while [ -L "$script" ]; do
+  link="$(readlink "$script")"
+  case "$link" in
+    /*) script="$link" ;;
+    *)  script="$(dirname "$script")/$link" ;;
+  esac
+done
+here="$(cd "$(dirname "$script")" && pwd)"
 exec node --experimental-transform-types --no-warnings --conditions @typescript/source "$here/src/main.ts" "$@"
