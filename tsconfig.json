@@ -6,6 +6,9 @@
     "allowImportingTsExtensions": true,
     "customConditions": ["@typescript/source"],
     "types": ["node"],
+    "paths": {
+      "#/*": ["./src/*"]
+    },
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true

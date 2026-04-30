@@ -1,0 +1,8 @@
+(Module
+  [
+    (VarDecl :kind const :name arr :init (ArrayLit [10 20 30]))
+    (VarDecl :kind const :name first :init (es.Index :array arr :index 0))
+    (VarDecl :kind const :name second :init (es.Index :array arr :index 1))
+    (VarDecl :kind const :name i :init 2)
+    (VarDecl :kind const :name third :init (es.Index :array arr :index i))
+  ])

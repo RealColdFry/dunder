@@ -1,0 +1,34 @@
+(Module
+  [
+    (VarDecl :kind const :name fns :init (ArrayLit []))
+    (Loop
+      :init [(VarDecl :kind let :name i :init 0)]
+      :body [
+              (VarDecl :kind let :name %i_inner_0 :init i)
+              (If
+                :cond (LogicalNot (Cmp :op < %i_inner_0 3))
+                :then [(Assign :target i :value %i_inner_0) (Break)])
+              (Assign
+                :target (es.Index :array fns :index (es.ArrayLength fns))
+                :value (ArrowFun :params [] :body [(Return %i_inner_0)]))
+            ]
+      :update [
+                (Assign :target i :value %i_inner_0)
+                (Assign :target i :value (es.NumericAdd i 1))
+              ])
+    (VarDecl :kind let :name %call_arg_1 :init print)
+    (ExprStmt
+      (Call
+        :callee %call_arg_1
+        :args [(Call :callee (es.Index :array fns :index 0) :args [])]))
+    (VarDecl :kind let :name %call_arg_2 :init print)
+    (ExprStmt
+      (Call
+        :callee %call_arg_2
+        :args [(Call :callee (es.Index :array fns :index 1) :args [])]))
+    (VarDecl :kind let :name %call_arg_3 :init print)
+    (ExprStmt
+      (Call
+        :callee %call_arg_3
+        :args [(Call :callee (es.Index :array fns :index 2) :args [])]))
+  ])

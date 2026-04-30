@@ -12,30 +12,58 @@ const INDENT = 2;
 // ---- Doc model -------------------------------------------------------------
 
 type Doc =
-  | { tag: "atom"; text: string }
-  | { tag: "form"; head: string; slots: Slot[] }
-  | { tag: "list"; items: Doc[] };
+  | {
+      tag: "atom";
+      text: string;
+    }
+  | {
+      tag: "form";
+      head: string;
+      slots: Slot[];
+    }
+  | {
+      tag: "list";
+      items: Doc[];
+    };
 
-type Slot = { kw?: string; value: Doc };
+type Slot = {
+  kw?: string;
+  value: Doc;
+};
 
 function atom(text: string): Doc {
-  return { tag: "atom", text };
+  return {
+    tag: "atom",
+    text,
+  };
 }
 
 function form(head: string, slots: Slot[]): Doc {
-  return { tag: "form", head, slots };
+  return {
+    tag: "form",
+    head,
+    slots,
+  };
 }
 
 function list(items: Doc[]): Doc {
-  return { tag: "list", items };
+  return {
+    tag: "list",
+    items,
+  };
 }
 
 function kw(key: string, value: Doc): Slot {
-  return { kw: key, value };
+  return {
+    kw: key,
+    value,
+  };
 }
 
 function pos(value: Doc): Slot {
-  return { value };
+  return {
+    value,
+  };
 }
 
 // ---- Layout ----------------------------------------------------------------
@@ -126,9 +154,9 @@ function docStmt(stmt: Stmt): Doc {
     case "FunDecl": {
       const slots: Slot[] = [];
       if (stmt.exported) slots.push(kw("exported", atom("true")));
-      slots.push(kw("name", atom(stmt.name)));
-      slots.push(kw("params", list(stmt.params.map((p) => atom(p.name)))));
-      slots.push(kw("body", list(stmt.body.map(docStmt))));
+      if (stmt.fn.name !== undefined) slots.push(kw("name", atom(stmt.fn.name)));
+      slots.push(kw("params", list(stmt.fn.params.map((p) => atom(p.name)))));
+      slots.push(kw("body", list(stmt.fn.body.map(docStmt))));
       return form("FunDecl", slots);
     }
 
@@ -144,7 +172,11 @@ function docStmt(stmt: Stmt): Doc {
     }
 
     case "Loop": {
-      const slots: Slot[] = [kw("body", list(stmt.body.map(docStmt)))];
+      const slots: Slot[] = [];
+      if (stmt.init !== undefined && stmt.init.length > 0) {
+        slots.push(kw("init", list(stmt.init.map(docStmt))));
+      }
+      slots.push(kw("body", list(stmt.body.map(docStmt))));
       if (stmt.update !== undefined) {
         slots.push(kw("update", list(stmt.update.map(docStmt))));
       }
@@ -165,24 +197,14 @@ function docStmt(stmt: Stmt): Doc {
       return form("ExprStmt", [pos(docExpr(stmt.expr))]);
 
     case "Assign":
-      return form("Assign", [
-        kw("target", docExpr(stmt.target)),
-        kw("value", docExpr(stmt.value)),
-      ]);
+      return form("Assign", [kw("target", docExpr(stmt.target)), kw("value", docExpr(stmt.value))]);
   }
 }
 
 function docPattern(pat: ArrayPattern): Doc {
-  return form(
-    "ArrPat",
-    [
-      pos(
-        list(
-          pat.elements.map((e) => form("ArrPatElem", [kw("name", atom(e.name))])),
-        ),
-      ),
-    ],
-  );
+  return form("ArrPat", [
+    pos(list(pat.elements.map((e) => form("ArrPatElem", [kw("name", atom(e.name))])))),
+  ]);
 }
 
 function docExpr(expr: Expr): Doc {
@@ -221,8 +243,8 @@ function docExpr(expr: Expr): Doc {
     case "UnaryExpression":
       return form("Unary", [kw("op", atom(expr.op)), pos(docExpr(expr.operand))]);
 
-    case "es.LogicalNot":
-      return form("es.LogicalNot", [pos(docExpr(expr.operand))]);
+    case "LogicalNot":
+      return form("LogicalNot", [pos(docExpr(expr.operand))]);
 
     case "es.Truthy":
       return form("es.Truthy", [pos(docExpr(expr.expr))]);
@@ -265,22 +287,47 @@ function docExpr(expr: Expr): Doc {
         kw("else", docExpr(expr.whenFalse)),
       ]);
 
-    case "ArrowFun":
-      return form("ArrowFun", [
-        kw("params", list(expr.params.map((p) => atom(p.name)))),
-        kw("body", list(expr.body.map(docStmt))),
-      ]);
+    case "Function": {
+      // Tag follows shape for readability: arrow → ArrowFun, expr → FunExpr.
+      // shape "decl" only appears here when a Function literal is somehow
+      // surfaced as an Expr (currently only via FunDecl, which extracts).
+      const head =
+        expr.shape === "arrow" ? "ArrowFun" : expr.shape === "expr" ? "FunExpr" : "Function";
+      const slots: Slot[] = [];
+      if (expr.name !== undefined) slots.push(kw("name", atom(expr.name)));
+      slots.push(kw("params", list(expr.params.map((p) => atom(p.name)))));
+      slots.push(kw("body", list(expr.body.map(docStmt))));
+      return form(head, slots);
+    }
 
     case "es.Index":
-      return form("es.Index", [
-        kw("array", docExpr(expr.array)),
-        kw("index", docExpr(expr.index)),
-      ]);
+      return form("es.Index", [kw("array", docExpr(expr.array)), kw("index", docExpr(expr.index))]);
 
     case "ElementAccess":
       return form("ElementAccess", [
         kw("receiver", docExpr(expr.receiver)),
         kw("index", docExpr(expr.index)),
+      ]);
+
+    case "es.Global":
+      return form("es.Global", [kw("name", atom(expr.name))]);
+
+    case "es.ObjectLiteral":
+      return form("es.ObjectLiteral", [
+        pos(
+          list(
+            expr.members.map((m) => {
+              if (m.kind === "spread") {
+                return form("Spread", [pos(docExpr(m.value))]);
+              }
+              const keyDoc =
+                m.key.kind === "static"
+                  ? atom(JSON.stringify(m.key.name))
+                  : form("Computed", [pos(docExpr(m.key.expr))]);
+              return form("KV", [kw("key", keyDoc), kw("value", docExpr(m.value))]);
+            }),
+          ),
+        ),
       ]);
   }
 }

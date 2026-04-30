@@ -7,21 +7,9 @@ import {
   isStringLiteral,
   SyntaxKind,
   type Node,
-} from "@typescript/native-preview/ast";
-import { type ResolvedAst } from "../frontend.ts";
-import { ir, type Expr, type Stmt } from "../ir/types.ts";
-
-export interface BuildCtx {
-  resolved: ResolvedAst;
-  // Stack of side-effect accumulators. Each frame is a fresh scope:
-  // sub-expressions push hoisted statements onto the top frame while
-  // building. Statement-emit boundaries flush the top. Block / function-body
-  // / branch boundaries push a new frame so preceding statements can't leak
-  // across the boundary.
-  precedingStmtsStack: Stmt[][];
-  // The `%` sigil marks IR-level temporaries.
-  freshName: (prefix: string) => string;
-}
+} from "#/ts.ts";
+import { ir, type Expr, type Stmt } from "#/ir/types.ts";
+import { type BuildCtx } from "./context.ts";
 
 function topFrame(ctx: BuildCtx): Stmt[] {
   const frame = ctx.precedingStmtsStack[ctx.precedingStmtsStack.length - 1];
@@ -60,11 +48,17 @@ export function popPrecedingScope(ctx: BuildCtx): Stmt[] {
 export function withPrecedingScope<T>(
   ctx: BuildCtx,
   fn: () => T,
-): { preceding: Stmt[]; result: T } {
+): {
+  preceding: Stmt[];
+  result: T;
+} {
   pushPrecedingScope(ctx);
   const result = fn();
   const preceding = popPrecedingScope(ctx);
-  return { preceding, result };
+  return {
+    preceding,
+    result,
+  };
 }
 
 export function updateAssign(target: Expr, op: "++" | "--"): Stmt {

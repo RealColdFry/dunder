@@ -1,0 +1,23 @@
+(Module
+  [
+    (VarDecl :kind const :name x :init 10)
+    (VarDecl
+      :kind const
+      :name o1
+      :init (es.ObjectLiteral
+              [
+                (KV :key "a" :value 1)
+                (KV :key "b" :value "two")
+                (KV :key "c" :value x)
+              ]))
+    (VarDecl
+      :kind const
+      :name o2
+      :init (es.ObjectLiteral [(KV :key "x" :value x)]))
+    (VarDecl :kind const :name k :init "dyn")
+    (VarDecl
+      :kind const
+      :name o3
+      :init (es.ObjectLiteral
+              [(KV :key (Computed k) :value 1) (KV :key "fixed" :value 2)]))
+  ])

@@ -1,0 +1,72 @@
+(Module
+  [
+    (FunDecl
+      :name countDown
+      :params [n]
+      :body [
+              (Loop
+                :body [
+                        (If :cond (LogicalNot (Cmp :op > n 0)) :then [(Break)])
+                        (Assign :target n :value (Arith :op - n 1))
+                      ])
+              (Return n)
+            ])
+    (FunDecl
+      :name sumTo
+      :params [n]
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (VarDecl :kind let :name total :init 0)
+              (Loop
+                :body [
+                        (If :cond (LogicalNot (Cmp :op < i n)) :then [(Break)])
+                        (Assign :target i :value (es.NumericAdd i 1))
+                        (Assign :target total :value (es.NumericAdd total i))
+                      ])
+              (Return total)
+            ])
+    (FunDecl
+      :name doAtLeastOnce
+      :params [n]
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (Loop
+                :body [(Assign :target i :value (es.NumericAdd i 1))]
+                :update [
+                          (If
+                            :cond (LogicalNot (Cmp :op < i n))
+                            :then [(Break)])
+                        ])
+              (Return i)
+            ])
+    (FunDecl
+      :name whileBreak
+      :params []
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (Loop
+                :body [
+                        (If :cond (LogicalNot true) :then [(Break)])
+                        (If :cond (Cmp :op >= i 5) :then [(Break)])
+                        (Assign :target i :value (es.NumericAdd i 1))
+                      ])
+              (Return i)
+            ])
+    (FunDecl
+      :name whileContinue
+      :params []
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (VarDecl :kind let :name evens :init 0)
+              (Loop
+                :body [
+                        (If :cond (LogicalNot (Cmp :op < i 10)) :then [(Break)])
+                        (Assign :target i :value (es.NumericAdd i 1))
+                        (If
+                          :cond (es.Equality :strict true (Arith :op % i 2) 1)
+                          :then [(Continue)])
+                        (Assign :target evens :value (es.NumericAdd evens 1))
+                      ])
+              (Return evens)
+            ])
+  ])

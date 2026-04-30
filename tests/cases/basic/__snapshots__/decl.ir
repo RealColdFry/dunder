@@ -1,0 +1,8 @@
+(Module
+  [
+    (VarDecl :kind const :name a :init 1)
+    (VarDecl :kind const :name b :init 2)
+    (VarDecl :kind const :name s :init "x")
+    (VarDecl :kind const :name c :init (es.NumericAdd a b))
+    (VarDecl :kind const :name t :init (es.StringConcat s s))
+  ])

@@ -1,0 +1,6 @@
+(Module
+  [
+    (FunDecl :name hello :params [a b] :body [(Return (es.StringConcat a b))])
+    (VarDecl :kind const :name a :init (Call :callee hello :args [1 "b"]))
+    (VarDecl :kind const :name b :init (Call :callee hello :args ["a" "b"]))
+  ])

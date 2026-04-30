@@ -1,0 +1,14 @@
+(Module
+  [
+    (VarDecl :kind const :name sub :init (Arith :op - 5 3))
+    (VarDecl :kind const :name mul :init (Arith :op * 4 2))
+    (VarDecl :kind const :name div :init (Arith :op / 10 4))
+    (VarDecl :kind const :name mod :init (Arith :op % 7 3))
+    (VarDecl :kind const :name pow :init (Arith :op ** 2 8))
+    (VarDecl :kind const :name neg :init (Unary :op - 5))
+    (VarDecl :kind const :name parens :init (Arith :op * (es.NumericAdd 1 2) 3))
+    (VarDecl :kind const :name lt :init (Cmp :op < 3 5))
+    (VarDecl :kind const :name gt :init (Cmp :op > 10 5))
+    (VarDecl :kind const :name le :init (Cmp :op <= 4 4))
+    (VarDecl :kind const :name ge :init (Cmp :op >= 5 6))
+  ])

@@ -8,5 +8,8 @@
   "env": {
     "builtin": true
   },
-  "ignorePatterns": ["extern/**", "examples/basic/**", "scripts/tstl-harness/**"]
+  "options": {
+    "typeAware": true
+  },
+  "ignorePatterns": ["extern/**", "scripts/tstl-harness/**", "scripts/replay/**", "tests/cases/**"]
 }

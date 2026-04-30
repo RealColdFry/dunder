@@ -21,19 +21,33 @@ import {
   type Node,
   type SourceFile,
 } from "@typescript/native-preview/ast";
-import { resolveTsgoBin } from "../../src/tsgo-bin.ts";
+import { resolveTsgoBin } from "#/frontend/tsgo-bin.ts";
 import { createReadStream, existsSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { dirname, resolve as resolvePath } from "node:path";
 import { isCallable } from "./replay-shared.ts";
 
 interface NodeArg {
-  node: { kind: string; pos: number; end: number; file?: string };
+  node: {
+    kind: string;
+    pos: number;
+    end: number;
+    file?: string;
+  };
 }
 interface RefArg {
   ref: number;
 }
-type Arg = NodeArg | RefArg | { opaque: true } | string | number | boolean | null;
+type Arg =
+  | NodeArg
+  | RefArg
+  | {
+      opaque: true;
+    }
+  | string
+  | number
+  | boolean
+  | null;
 
 interface Entry {
   seq: number;
@@ -88,7 +102,9 @@ function memoKey(e: Entry): string {
 async function readEntries(path: string, limit: number): Promise<Entry[]> {
   const out: Entry[] = [];
   const rl = createInterface({
-    input: createReadStream(path, { encoding: "utf8" }),
+    input: createReadStream(path, {
+      encoding: "utf8",
+    }),
     crlfDelay: Infinity,
   });
   for await (const line of rl) {
@@ -161,7 +177,10 @@ interface RunResult {
   ms: number;
   attempted: number;
   issued: number;
-  skipped: { reason: string; count: number }[];
+  skipped: {
+    reason: string;
+    count: number;
+  }[];
 }
 
 interface Coverage {
@@ -189,11 +208,18 @@ function resolveDeps(
   e: Entry,
   refMap: Map<number, unknown>,
   nodeLookup: Map<string, Node>,
-): ResolvedEntry | { reason: string } {
+):
+  | ResolvedEntry
+  | {
+      reason: string;
+    } {
   let receiver: unknown | null = null;
   if (e.receiverSeq !== null) {
     receiver = refMap.get(e.receiverSeq);
-    if (receiver === undefined) return { reason: "missing-receiver" };
+    if (receiver === undefined)
+      return {
+        reason: "missing-receiver",
+      };
   }
   const argRefs: unknown[] = [];
   const argScalars: (string | number | boolean | null)[] = [];
@@ -201,119 +227,208 @@ function resolveDeps(
   for (const a of e.args) {
     if (isRefArg(a)) {
       const v = refMap.get(a.ref);
-      if (v === undefined) return { reason: "missing-arg-ref" };
+      if (v === undefined)
+        return {
+          reason: "missing-arg-ref",
+        };
       argRefs.push(v);
     } else if (isNodeArg(a)) {
       const n = a.node;
-      if (!n.file || n.pos < 0 || n.end < 0) return { reason: "synthetic-node" };
+      if (!n.file || n.pos < 0 || n.end < 0)
+        return {
+          reason: "synthetic-node",
+        };
       const kindNum = syntaxKindFromName(n.kind);
-      if (kindNum === undefined) return { reason: "unknown-syntax-kind" };
+      if (kindNum === undefined)
+        return {
+          reason: "unknown-syntax-kind",
+        };
       const live = nodeLookup.get(nodeKey(n.file, n.pos, n.end, kindNum));
-      if (!live) return { reason: "node-not-found" };
+      if (!live)
+        return {
+          reason: "node-not-found",
+        };
       argNodes.push(live);
     } else if (typeof a === "object" && a !== null && "opaque" in a) {
-      return { reason: "opaque-arg" };
+      return {
+        reason: "opaque-arg",
+      };
     } else {
       argScalars.push(a as string | number | boolean | null);
     }
   }
   // layer is set by caller.
-  return { entry: e, layer: 0, receiver, argRefs, argScalars, argNodes };
+  return {
+    entry: e,
+    layer: 0,
+    receiver,
+    argRefs,
+    argScalars,
+    argNodes,
+  };
 }
 
 // Single-call dispatch keyed off the trace's `mapsTo` (IPC method name).
 function dispatch(
   checker: Checker,
   r: ResolvedEntry,
-): (() => Promise<unknown>) | { reason: string } {
+):
+  | (() => Promise<unknown>)
+  | {
+      reason: string;
+    } {
   const { entry: e, receiver, argNodes, argRefs, argScalars } = r;
   switch (e.mapsTo) {
     case "getTypeAtLocation":
-      if (argNodes.length !== 1) return { reason: "bad-arity" };
+      if (argNodes.length !== 1)
+        return {
+          reason: "bad-arity",
+        };
       return () => checker.getTypeAtLocation(argNodes[0]);
     case "getSymbolAtLocation":
-      if (argNodes.length !== 1) return { reason: "bad-arity" };
+      if (argNodes.length !== 1)
+        return {
+          reason: "bad-arity",
+        };
       return () => checker.getSymbolAtLocation(argNodes[0]);
     case "getTypeOfSymbolAtLocation": {
-      if (argRefs.length !== 1 || argNodes.length !== 1) return { reason: "bad-arity" };
+      if (argRefs.length !== 1 || argNodes.length !== 1)
+        return {
+          reason: "bad-arity",
+        };
       const sym = argRefs[0] as TsSymbol;
       return () => checker.getTypeOfSymbolAtLocation(sym, argNodes[0]);
     }
     case "getDeclaredTypeOfSymbol": {
-      if (argRefs.length !== 1) return { reason: "bad-arity" };
+      if (argRefs.length !== 1)
+        return {
+          reason: "bad-arity",
+        };
       const sym = argRefs[0] as TsSymbol;
       return () => checker.getDeclaredTypeOfSymbol(sym);
     }
     case "getSignaturesOfType": {
-      if (argRefs.length !== 1 || argScalars.length !== 1) return { reason: "bad-arity" };
+      if (argRefs.length !== 1 || argScalars.length !== 1)
+        return {
+          reason: "bad-arity",
+        };
       const t = argRefs[0] as Type;
       const kind = argScalars[0] as number;
       return () => checker.getSignaturesOfType(t, kind);
     }
     case "getSignaturesOfType(Call)": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => checker.getSignaturesOfType(receiver as Type, SignatureKind.Call);
     }
     case "getContextualType":
-      if (argNodes.length !== 1) return { reason: "bad-arity" };
+      if (argNodes.length !== 1)
+        return {
+          reason: "bad-arity",
+        };
       return () => checker.getContextualType(argNodes[0] as Expression);
     case "getPropertiesOfType": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => checker.getPropertiesOfType(receiver as Type);
     }
     case "getBaseTypes":
     case "Type.getBaseType": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => checker.getBaseTypes(receiver as Type);
     }
     case "getReturnTypeOfSignature":
     case "Signature.getReturnType": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => checker.getReturnTypeOfSignature(receiver as Signature);
     }
     case "getTypeArguments": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => checker.getTypeArguments(receiver as Type);
     }
     case "Type.getSymbol": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => (receiver as Type).getSymbol();
     }
     case "Type.getTypes": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       // Only valid on UnionOrIntersectionType / TemplateLiteralType.
       // Cast through unknown to a structural type that exposes getTypes.
       const t = receiver as unknown as {
         getTypes?: () => Promise<readonly Type[]>;
       };
-      if (typeof t.getTypes !== "function") return { reason: "no-method-on-type" };
+      if (typeof t.getTypes !== "function")
+        return {
+          reason: "no-method-on-type",
+        };
       return () => t.getTypes!();
     }
     case "Type.getConstraint": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       // Only valid on SubstitutionType.
-      const t = receiver as unknown as { getConstraint?: () => Promise<Type> };
-      if (typeof t.getConstraint !== "function") return { reason: "no-method-on-type" };
+      const t = receiver as unknown as {
+        getConstraint?: () => Promise<Type>;
+      };
+      if (typeof t.getConstraint !== "function")
+        return {
+          reason: "no-method-on-type",
+        };
       return () => t.getConstraint!();
     }
     case "Symbol.getMembers": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => (receiver as TsSymbol).getMembers();
     }
     case "Symbol.getExports": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => (receiver as TsSymbol).getExports();
     }
     case "Symbol.getParent": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => (receiver as TsSymbol).getParent();
     }
     case "Symbol.getExportSymbol": {
-      if (!receiver) return { reason: "no-receiver" };
+      if (!receiver)
+        return {
+          reason: "no-receiver",
+        };
       return () => (receiver as TsSymbol).getExportSymbol();
     }
     default:
-      return { reason: `no-mapping:${e.mapsTo}` };
+      return {
+        reason: `no-mapping:${e.mapsTo}`,
+      };
   }
 }
 
@@ -474,7 +589,11 @@ async function runLayered(
         bumpSkip(cov, d.reason);
         continue;
       }
-      (r as ResolvedEntry & { thunk?: () => Promise<unknown> }).thunk = d;
+      (
+        r as ResolvedEntry & {
+          thunk?: () => Promise<unknown>;
+        }
+      ).thunk = d;
       if (policy === "memoized-batched") queuedKeys.add(memoKey(e));
       if (
         useBatchOverloads &&
@@ -486,9 +605,15 @@ async function runLayered(
           arr = [];
           pendingByMethod.set(e.mapsTo, arr);
         }
-        arr.push({ entry: e, resolved: r });
+        arr.push({
+          entry: e,
+          resolved: r,
+        });
       } else {
-        pendingSequential.push({ entry: e, resolved: r });
+        pendingSequential.push({
+          entry: e,
+          resolved: r,
+        });
       }
     }
 
@@ -496,7 +621,11 @@ async function runLayered(
     // for the supported methods, plus Promise.all for the rest. Each promise
     // resolves to an array of {entry, result?, error?} so a single failure
     // doesn't poison the layer.
-    type Outcome = { entry: Entry; result?: unknown; error?: unknown };
+    type Outcome = {
+      entry: Entry;
+      result?: unknown;
+      error?: unknown;
+    };
     const promises: Promise<Outcome[]>[] = [];
 
     for (const [method, items] of pendingByMethod) {
@@ -507,16 +636,32 @@ async function runLayered(
             ? checker.getTypeAtLocation(nodes)
             : checker.getSymbolAtLocation(nodes);
         const p = call.then(
-          (arr) => items.map((it, i) => ({ entry: it.entry, result: arr[i] })),
-          (err) => items.map((it) => ({ entry: it.entry, error: err })),
+          (arr) =>
+            items.map((it, i) => ({
+              entry: it.entry,
+              result: arr[i],
+            })),
+          (err) =>
+            items.map((it) => ({
+              entry: it.entry,
+              error: err,
+            })),
         );
         promises.push(p);
         cov.issued++;
       } else if (method === "getTypeOfSymbol") {
         const symbols = items.map((it) => it.resolved.argRefs[0] as TsSymbol);
         const p = checker.getTypeOfSymbol(symbols).then(
-          (arr) => items.map((it, i) => ({ entry: it.entry, result: arr[i] })),
-          (err) => items.map((it) => ({ entry: it.entry, error: err })),
+          (arr) =>
+            items.map((it, i) => ({
+              entry: it.entry,
+              result: arr[i],
+            })),
+          (err) =>
+            items.map((it) => ({
+              entry: it.entry,
+              error: err,
+            })),
         );
         promises.push(p);
         cov.issued++;
@@ -526,11 +671,25 @@ async function runLayered(
     }
 
     for (const it of pendingSequential) {
-      const thunk = (it.resolved as ResolvedEntry & { thunk: () => Promise<unknown> }).thunk;
+      const thunk = (
+        it.resolved as ResolvedEntry & {
+          thunk: () => Promise<unknown>;
+        }
+      ).thunk;
       promises.push(
         thunk().then(
-          (result) => [{ entry: it.entry, result }],
-          (err) => [{ entry: it.entry, error: err }],
+          (result) => [
+            {
+              entry: it.entry,
+              result,
+            },
+          ],
+          (err) => [
+            {
+              entry: it.entry,
+              error: err,
+            },
+          ],
         ),
       );
       cov.issued++;
@@ -628,7 +787,9 @@ async function main(): Promise<void> {
     cwd: dirname(args.project),
   });
   try {
-    const snapshot = await api.updateSnapshot({ openProject: args.project });
+    const snapshot = await api.updateSnapshot({
+      openProject: args.project,
+    });
     const project = snapshot.getProject(args.project);
     if (!project) throw new Error(`project not loaded: ${args.project}`);
     // Force project-wide checking once so semantic state is warm.
@@ -639,7 +800,11 @@ async function main(): Promise<void> {
     console.error(`  ${nodeLookup.size.toLocaleString()} nodes indexed`);
 
     const runOnce = async (): Promise<RunResult> => {
-      const cov: Coverage = { attempted: 0, issued: 0, skipReasons: new Map() };
+      const cov: Coverage = {
+        attempted: 0,
+        issued: 0,
+        skipReasons: new Map(),
+      };
       const t0 = performance.now();
       switch (args.policy) {
         case "naive":
@@ -673,7 +838,10 @@ async function main(): Promise<void> {
         issued: cov.issued,
         skipped: [...cov.skipReasons.entries()]
           .sort((a, b) => b[1] - a[1])
-          .map(([reason, count]) => ({ reason, count })),
+          .map(([reason, count]) => ({
+            reason,
+            count,
+          })),
       };
     };
 

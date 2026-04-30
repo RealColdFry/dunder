@@ -1,13 +1,16 @@
 {
   "name": "dunder",
   "private": true,
+  "bin": {
+    "dunder": "./dunder"
+  },
   "workspaces": [
     "extern/tstl",
     "extern/typescript-go/_packages/native-preview"
   ],
   "type": "module",
-  "bin": {
-    "dunder": "./dunder"
+  "imports": {
+    "#/*": "./src/*"
   },
   "scripts": {
     "dunder": "node --experimental-transform-types --no-warnings --conditions @typescript/source src/main.ts",
@@ -15,11 +18,12 @@
     "compare": "node --experimental-transform-types --no-warnings --conditions @typescript/source scripts/compare.ts",
     "replay-sim": "node --experimental-transform-types --no-warnings --conditions @typescript/source scripts/replay/replay-sim.ts",
     "replay-bench": "node --experimental-transform-types --no-warnings --conditions @typescript/source scripts/replay/replay-bench.ts",
-    "typecheck": "extern/typescript-go/built/local/tsgo --noEmit -p .",
+    "typecheck": "extern/typescript-go/built/local/tsgo --noEmit -p . && extern/typescript-go/built/local/tsgo --noEmit -p tests",
     "test": "vitest run",
     "test:watch": "vitest",
-    "tstl-tests": "DUNDER_TEST=1 npx jest --config scripts/tstl-harness/jest.config.cjs",
-    "lint": "oxlint --type-aware",
+    "tstl-tests": "DUNDER_TEST=1 vitest run --config scripts/tstl-harness/vitest.config.ts",
+    "tstl-baseline": "node --experimental-transform-types --no-warnings --conditions @typescript/source scripts/tstl-harness/run-baseline.ts",
+    "lint": "oxlint",
     "fmt": "oxfmt .",
     "fmt:check": "oxfmt --check ."
   },

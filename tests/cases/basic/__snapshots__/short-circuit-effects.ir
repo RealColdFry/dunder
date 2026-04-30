@@ -1,0 +1,41 @@
+(Module
+  [
+    (FunDecl
+      :name andEffect
+      :params [cond]
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (VarDecl :kind let :name %and_0 :init cond)
+              (If
+                :cond %and_0
+                :then [
+                        (Assign :target i :value (es.NumericAdd i 1))
+                        (Assign :target %and_0 :value i)
+                      ])
+              (VarDecl :kind const :name r :init %and_0)
+              (Return (es.NumericAdd r i))
+            ])
+    (FunDecl
+      :name orEffect
+      :params [cond]
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (VarDecl :kind let :name %or_1 :init cond)
+              (If
+                :cond (LogicalNot %or_1)
+                :then [
+                        (Assign :target i :value (es.NumericAdd i 1))
+                        (Assign :target %or_1 :value i)
+                      ])
+              (VarDecl :kind const :name r :init %or_1)
+              (Return (es.NumericAdd r i))
+            ])
+    (FunDecl
+      :name pureAnd
+      :params [a b]
+      :body [(Return (es.LogicalExpression :op && a b))])
+    (FunDecl
+      :name pureOr
+      :params [a b]
+      :body [(Return (es.LogicalExpression :op || a b))])
+  ])

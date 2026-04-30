@@ -1,0 +1,7 @@
+(Module
+  [
+    (VarDecl :kind const :name n :init 1)
+    (VarDecl :kind const :name s :init "1")
+    (VarDecl :kind const :name agree :init (es.Equality :strict true n s))
+    (VarDecl :kind const :name disagree :init (es.Equality n s))
+  ])

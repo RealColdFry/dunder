@@ -9,7 +9,17 @@ export interface LuaCapabilities {
    * - `tableGetn`: `table.getn(arr)` (Lua 5.0).
    * - `call`: `<fn>(arr)` host adapter.
    */
-  arrayLength: { kind: "native" } | { kind: "tableGetn" } | { kind: "call"; fn: string };
+  arrayLength:
+    | {
+        kind: "native";
+      }
+    | {
+        kind: "tableGetn";
+      }
+    | {
+        kind: "call";
+        fn: string;
+      };
 
   /**
    * Array → multi-return spread.
@@ -17,7 +27,17 @@ export interface LuaCapabilities {
    * - `table`: `table.unpack(arr, 1, n)` (Lua 5.2+/Luau).
    * - `lualib`: `__TS__Unpack(arr)`, requires lualib.
    */
-  unpack: { kind: "global"; supportsBounds: boolean } | { kind: "table" } | { kind: "lualib" };
+  unpack:
+    | {
+        kind: "global";
+        supportsBounds: boolean;
+      }
+    | {
+        kind: "table";
+      }
+    | {
+        kind: "lualib";
+      };
 
   /**
    * `goto`/`::label::`. Lua 5.2+, Luau, modern LuaJIT.
@@ -29,71 +49,163 @@ export interface LuaCapabilities {
    * which would skip ES-required update statements.
    */
   hasNativeContinue: boolean;
+
+  /**
+   * How modulo emits.
+   * - `operator`: `a % b` (Lua 5.1+, Luau, LuaJIT). Sign-of-divisor;
+   *   diverges from ES (DIV-MOD-001) but cheap.
+   * - `fn`: `<name>(a, b)`, where `name` is `math.fmod` on 5.1+ and
+   *   `math.mod` on 5.0 (renamed in 5.1). Both round toward zero,
+   *   matching ES. An ES-faithful backend on any target may opt into
+   *   this form; for 5.0 there is no other option since the operator
+   *   doesn't exist.
+   */
+  mod:
+    | {
+        kind: "operator";
+      }
+    | {
+        kind: "fn";
+        fn: string;
+      };
 }
 
 // ── Presets ────────────────────────────────────────────────────────────────
 
 export const Lua50: LuaCapabilities = {
-  arrayLength: { kind: "tableGetn" },
-  unpack: { kind: "global", supportsBounds: false },
+  arrayLength: {
+    kind: "tableGetn",
+  },
+  unpack: {
+    kind: "global",
+    supportsBounds: false,
+  },
   hasGoto: false,
   hasNativeContinue: false,
+  // 5.0 has no `%` operator; `math.mod` (renamed `math.fmod` in 5.1)
+  // is the only option.
+  mod: {
+    kind: "fn",
+    fn: "math.mod",
+  },
 };
 
 export const Lua51: LuaCapabilities = {
-  arrayLength: { kind: "native" },
-  unpack: { kind: "global", supportsBounds: true },
+  arrayLength: {
+    kind: "native",
+  },
+  unpack: {
+    kind: "global",
+    supportsBounds: true,
+  },
   hasGoto: false,
   hasNativeContinue: false,
+  mod: {
+    kind: "operator",
+  },
 };
 
 export const Lua52: LuaCapabilities = {
-  arrayLength: { kind: "native" },
-  unpack: { kind: "table" },
+  arrayLength: {
+    kind: "native",
+  },
+  unpack: {
+    kind: "table",
+  },
   hasGoto: true,
   hasNativeContinue: false,
+  mod: {
+    kind: "operator",
+  },
 };
 
 export const Lua53: LuaCapabilities = {
-  arrayLength: { kind: "native" },
-  unpack: { kind: "table" },
+  arrayLength: {
+    kind: "native",
+  },
+  unpack: {
+    kind: "table",
+  },
   hasGoto: true,
   hasNativeContinue: false,
+  mod: {
+    kind: "operator",
+  },
 };
 
 export const Lua54: LuaCapabilities = {
-  arrayLength: { kind: "native" },
-  unpack: { kind: "table" },
+  arrayLength: {
+    kind: "native",
+  },
+  unpack: {
+    kind: "table",
+  },
   hasGoto: true,
   hasNativeContinue: false,
+  mod: {
+    kind: "operator",
+  },
 };
 
 export const Lua55: LuaCapabilities = {
-  arrayLength: { kind: "native" },
-  unpack: { kind: "table" },
+  arrayLength: {
+    kind: "native",
+  },
+  unpack: {
+    kind: "table",
+  },
   hasGoto: true,
   hasNativeContinue: false,
+  mod: {
+    kind: "operator",
+  },
 };
 
 export const LuaJIT: LuaCapabilities = {
-  arrayLength: { kind: "native" },
-  unpack: { kind: "global", supportsBounds: true },
+  arrayLength: {
+    kind: "native",
+  },
+  unpack: {
+    kind: "global",
+    supportsBounds: true,
+  },
   hasGoto: true,
   hasNativeContinue: false,
+  mod: {
+    kind: "operator",
+  },
 };
 
 export const Luau: LuaCapabilities = {
-  arrayLength: { kind: "native" },
-  unpack: { kind: "table" },
+  arrayLength: {
+    kind: "native",
+  },
+  unpack: {
+    kind: "table",
+  },
   hasGoto: true,
   hasNativeContinue: true,
+  mod: {
+    kind: "operator",
+  },
 };
 
+// TSTL's "universal" target: 5.1 and up. 5.0 is excluded, so the `%`
+// operator and native `#` are available; goto is not (5.1 lacks it).
+// `unpack` goes through the lualib helper to abstract over the
+// 5.1-global-`unpack` vs 5.2-`table.unpack` split.
 export const Universal: LuaCapabilities = {
-  arrayLength: { kind: "native" },
-  unpack: { kind: "lualib" },
+  arrayLength: {
+    kind: "native",
+  },
+  unpack: {
+    kind: "lualib",
+  },
   hasGoto: false,
   hasNativeContinue: false,
+  mod: {
+    kind: "operator",
+  },
 };
 
 export const presets: Record<string, LuaCapabilities> = {

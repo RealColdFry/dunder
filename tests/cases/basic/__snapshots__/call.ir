@@ -1,0 +1,5 @@
+(Module
+  [
+    (FunDecl :name add :params [a b] :body [(Return (es.NumericAdd a b))])
+    (VarDecl :kind const :name x :init (Call :callee add :args [1 2]))
+  ])

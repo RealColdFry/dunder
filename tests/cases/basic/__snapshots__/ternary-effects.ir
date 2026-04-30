@@ -1,0 +1,50 @@
+(Module
+  [
+    (FunDecl
+      :name statementPos
+      :params [cond]
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (If
+                :cond cond
+                :then [(Assign :target i :value (es.NumericAdd i 1))]
+                :else [(Assign :target i :value (Arith :op - i 1))])
+              (Return i)
+            ])
+    (FunDecl
+      :name effectfulTrue
+      :params [cond]
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (VarDecl :kind let :name %ternary_0)
+              (If
+                :cond cond
+                :then [
+                        (Assign :target i :value (es.NumericAdd i 1))
+                        (Assign :target %ternary_0 :value i)
+                      ]
+                :else [(Assign :target %ternary_0 :value i)])
+              (VarDecl :kind const :name r :init %ternary_0)
+              (Return (es.NumericAdd r i))
+            ])
+    (FunDecl
+      :name effectfulFalse
+      :params [cond]
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (VarDecl :kind let :name %ternary_1)
+              (If
+                :cond cond
+                :then [(Assign :target %ternary_1 :value i)]
+                :else [
+                        (Assign :target i :value (es.NumericAdd i 2))
+                        (Assign :target %ternary_1 :value i)
+                      ])
+              (VarDecl :kind const :name r :init %ternary_1)
+              (Return (es.NumericAdd r i))
+            ])
+    (FunDecl
+      :name pure
+      :params [cond]
+      :body [(Return (es.Conditional :cond cond :then 1 :else 2))])
+  ])

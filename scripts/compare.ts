@@ -39,7 +39,11 @@ const tsconfigPath = findTsconfig(targetFile);
 const captured: Record<string, string> = {};
 const oracleEmit = transpileProject(
   tsconfigPath,
-  { noHeader: true, noEmit: false, noImplicitSelf: true },
+  {
+    noHeader: true,
+    noEmit: false,
+    noImplicitSelf: true,
+  },
   (fileName, data) => {
     captured[fileName] = data;
   },

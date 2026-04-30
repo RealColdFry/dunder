@@ -1,0 +1,12 @@
+(Module
+  [
+    (If :cond (es.Truthy n) :then [])
+    (Loop :body [(If :cond (LogicalNot (es.Truthy s)) :then [(Break)])])
+    (Loop :body [] :update [(If :cond (LogicalNot o) :then [(Break)])])
+    (VarDecl
+      :kind const
+      :name x
+      :init (es.Conditional :cond (es.Truthy n) :then 1 :else 2))
+    (If :cond (es.Truthy maybeN) :then [])
+    (If :cond b :then [])
+  ])

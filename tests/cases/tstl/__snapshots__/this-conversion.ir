@@ -1,0 +1,7 @@
+(Module
+  [
+    (VarDecl :kind const :name f :init (FunExpr :params [] :body [(Return 1)]))
+    (VarDecl :kind const :name g :init f)
+    (VarDecl :kind const :name h :init (ArrowFun :params [] :body [(Return 1)]))
+    (VarDecl :kind const :name i :init h)
+  ])

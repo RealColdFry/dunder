@@ -1,0 +1,36 @@
+(Module
+  [
+    (FunDecl
+      :exported true
+      :name __main
+      :params []
+      :body [
+              (VarDecl :kind const :name arr :init (ArrayLit [10 20 30 40 50]))
+              (VarDecl :kind let :name sum :init 0)
+              (VarDecl :kind let :name i :init 0)
+              (Loop
+                :body [
+                        (If
+                          :cond (LogicalNot (Cmp :op < i (es.ArrayLength arr)))
+                          :then [(Break)])
+                        (Assign
+                          :target sum
+                          :value (es.NumericAdd
+                                   sum
+                                   (es.Index :array arr :index i)))
+                        (Assign :target i :value (es.NumericAdd i 1))
+                      ])
+              (Return
+                (es.ObjectLiteral
+                  [
+                    (KV :key "sum" :value sum)
+                    (KV :key "len" :value (es.ArrayLength arr))
+                    (KV :key "first" :value (es.Index :array arr :index 0))
+                    (KV
+                      :key "last"
+                      :value (es.Index
+                               :array arr
+                               :index (Arith :op - (es.ArrayLength arr) 1)))
+                  ]))
+            ])
+  ])

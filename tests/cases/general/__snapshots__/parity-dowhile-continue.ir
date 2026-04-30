@@ -1,0 +1,49 @@
+(Module
+  [
+    (FunDecl
+      :exported true
+      :name __main
+      :params []
+      :body [
+              (VarDecl :kind const :name arrTest :init (ArrayLit [0 1 2 3 4]))
+              (VarDecl :kind let :name i :init 0)
+              (Loop
+                :body [
+                        (If
+                          :cond (es.Equality (Arith :op % i 2) 0)
+                          :then [
+                                  (Assign :target i :value (es.NumericAdd i 1))
+                                  (Continue)
+                                ])
+                        (VarDecl :kind let :name j :init 2)
+                        (Loop
+                          :body [
+                                  (If
+                                    :cond (es.Equality j 2)
+                                    :then [
+                                            (Assign
+                                              :target j
+                                              :value (Arith :op - j 1))
+                                            (Continue)
+                                          ])
+                                  (Assign
+                                    :target (es.Index :array arrTest :index i)
+                                    :value j)
+                                  (Assign :target j :value (Arith :op - j 1))
+                                ]
+                          :update [
+                                    (If
+                                      :cond (LogicalNot (Cmp :op > j 0))
+                                      :then [(Break)])
+                                  ])
+                        (Assign :target i :value (es.NumericAdd i 1))
+                      ]
+                :update [
+                          (If
+                            :cond (LogicalNot
+                                    (Cmp :op < i (es.ArrayLength arrTest)))
+                            :then [(Break)])
+                        ])
+              (Return arrTest)
+            ])
+  ])

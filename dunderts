@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Synchronous tsc-pipeline counterpart to ./dunder. Useful while the tsgo
+# IPC frontend is gated by the SyntaxKind drift; everything else (build,
+# lower, emit) is shared.
+set -e
+script="$0"
+while [ -L "$script" ]; do
+  link="$(readlink "$script")"
+  case "$link" in
+    /*) script="$link" ;;
+    *)  script="$(dirname "$script")/$link" ;;
+  esac
+done
+here="$(cd "$(dirname "$script")" && pwd)"
+exec node --experimental-transform-types --no-warnings --conditions @typescript/source "$here/src/main.tsc.ts" "$@"

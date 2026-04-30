@@ -1,0 +1,5 @@
+(Module
+  [
+    (VarDecl :kind const :name arr :init (ArrayLit [1 2 3]))
+    (VarDecl :kind const :name n :init (es.ArrayLength arr))
+  ])

@@ -1,0 +1,14 @@
+(Module
+  [
+    (FunDecl
+      :name check
+      :params [x s]
+      :body [
+              (If :cond (es.Truthy x) :then [(Return s)])
+              (Return
+                (es.Conditional
+                  :cond (LogicalNot (es.Truthy s))
+                  :then "empty"
+                  :else "ok"))
+            ])
+  ])

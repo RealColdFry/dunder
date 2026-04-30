@@ -1,0 +1,6 @@
+[
+  "tstl/truthy.ts(9,5): warning D201003: Only false and nil evaluate to 'false' in Lua, everything else is considered 'true'. Explicitly compare the value with ===.",
+  "tstl/truthy.ts(12,8): warning D201003: Only false and nil evaluate to 'false' in Lua, everything else is considered 'true'. Explicitly compare the value with ===.",
+  "tstl/truthy.ts(14,14): warning D201003: Only false and nil evaluate to 'false' in Lua, everything else is considered 'true'. Explicitly compare the value with ===.",
+  "tstl/truthy.ts(16,11): warning D201003: Only false and nil evaluate to 'false' in Lua, everything else is considered 'true'. Explicitly compare the value with ===."
+]

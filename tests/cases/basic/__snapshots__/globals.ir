@@ -1,0 +1,16 @@
+(Module
+  [
+    (VarDecl :kind const :name a :init (es.Global :name NaN))
+    (VarDecl :kind const :name b :init (es.Global :name Infinity))
+    (VarDecl :kind const :name c :init (es.Global :name globalThis))
+    (VarDecl :kind const :name d :init (es.Global :name undefined))
+    (VarDecl
+      :kind const
+      :name shorthand
+      :init (es.ObjectLiteral
+              [
+                (KV :key "NaN" :value (es.Global :name NaN))
+                (KV :key "Infinity" :value (es.Global :name Infinity))
+              ]))
+    (FunDecl :name shadow :params [NaN] :body [(Return NaN)])
+  ])

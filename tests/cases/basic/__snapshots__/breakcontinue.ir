@@ -1,0 +1,25 @@
+(Module
+  [
+    (FunDecl
+      :name findFirstEven
+      :params [n]
+      :body [
+              (Loop
+                :init [(VarDecl :kind let :name i :init 0)]
+                :body [
+                        (If :cond (LogicalNot (Cmp :op < i n)) :then [(Break)])
+                        (If
+                          :cond (es.Equality :strict true i 0)
+                          :then [(Continue)])
+                        (If
+                          :cond (es.Equality :strict true (Arith :op % i 2) 0)
+                          :then [(Return i)])
+                        (If :cond (Cmp :op > i 100) :then [(Break)])
+                      ]
+                :update [(Assign :target i :value (es.NumericAdd i 1))])
+              (Return (Unary :op - 1))
+            ])
+    (VarDecl :kind let :name %call_arg_0 :init print)
+    (ExprStmt
+      (Call :callee %call_arg_0 :args [(Call :callee findFirstEven :args [20])]))
+  ])

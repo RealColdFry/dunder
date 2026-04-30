@@ -1,0 +1,13 @@
+(Module
+  [
+    (FunDecl
+      :exported true
+      :name __main
+      :params []
+      :body [
+              (VarDecl :kind const :name a :init (es.NumericAdd 3 4))
+              (VarDecl :kind const :name b :init (Arith :op * a 2))
+              (VarDecl :kind const :name c :init (Arith :op - b 5))
+              (Return c)
+            ])
+  ])

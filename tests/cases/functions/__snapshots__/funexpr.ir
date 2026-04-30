@@ -1,0 +1,8 @@
+(Module
+  [
+    (VarDecl :kind const :name a :init (FunExpr :params [] :body [(Return 1)]))
+    (VarDecl
+      :kind const
+      :name b
+      :init (FunExpr :name named :params [] :body [(Return 2)]))
+  ])

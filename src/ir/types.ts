@@ -23,13 +23,25 @@ export function isModule(node: { kind: string }): node is Module {
 }
 
 function createModule(body: Stmt[]): Module {
-  return { kind: "Module", body };
+  return {
+    kind: "Module",
+    body,
+  };
 }
 
 export type BindingKind = "let" | "const" | "var";
 
+// `default` and `rest` are preserved on the parameter rather than desugared at
+// build time. Default expressions can read sibling params, capture outer scope,
+// and have side effects per call: the per-target lowering owns the prologue
+// shape (e.g. `if x == nil then x = <default> end`) and may skip the check
+// when a backend's type info proves the param is always provided. `rest` is a
+// marker only; whether it materializes a Lua table eagerly, lazily, or stays
+// as bare `...` is also a per-target call.
 export interface Parameter {
   name: string;
+  default?: Expr;
+  rest?: true;
 }
 
 // ── Statements ──────────────────────────────────────────────────────────────
@@ -100,12 +112,14 @@ function createDestructure(opts: {
   };
 }
 
+// Hoisted function declaration. Wraps a `Function` value (with shape "decl")
+// so the function-literal traversal is uniform across decl/expr/arrow; the
+// statement form adds `exported` and is what the build pass emits at scope
+// top so backends can hoist independently of the literal.
 export interface FunDecl {
   kind: "FunDecl";
   exported: boolean;
-  name: string;
-  params: Parameter[];
-  body: Stmt[];
+  fn: Function;
 }
 
 export function isFunDecl(s: Stmt): s is FunDecl {
@@ -120,10 +134,13 @@ function createFunDecl(opts: {
 }): FunDecl {
   return {
     kind: "FunDecl",
-    name: opts.name,
-    params: opts.params,
-    body: opts.body,
     exported: opts.exported ?? false,
+    fn: createFunction({
+      shape: "decl",
+      name: opts.name,
+      params: opts.params,
+      body: opts.body,
+    }),
   };
 }
 
@@ -139,7 +156,12 @@ export function isIf(s: Stmt): s is If {
 }
 
 function createIf(cond: Expr, consequent: Stmt[], alternate?: Stmt[]): If {
-  return { kind: "If", cond, consequent, alternate };
+  return {
+    kind: "If",
+    cond,
+    consequent,
+    alternate,
+  };
 }
 
 // Generic ES loop. `body` runs each iteration; `update` runs after body and
@@ -147,6 +169,10 @@ function createIf(cond: Expr, consequent: Stmt[], alternate?: Stmt[]): If {
 // is what lets Continue still trigger update.
 export interface Loop {
   kind: "Loop";
+  // Init statements run once before the loop. Lowered inside the loop's
+  // own scope (Lua `do ... end`) so `let`-init bindings don't leak into
+  // the surrounding block. Empty/undefined for `while` and `do-while`.
+  init?: Stmt[];
   body: Stmt[];
   update?: Stmt[];
 }
@@ -155,8 +181,13 @@ export function isLoop(s: Stmt): s is Loop {
   return s.kind === "Loop";
 }
 
-function createLoop(opts: { body: Stmt[]; update?: Stmt[] }): Loop {
-  return { kind: "Loop", body: opts.body, update: opts.update };
+function createLoop(opts: { init?: Stmt[]; body: Stmt[]; update?: Stmt[] }): Loop {
+  return {
+    kind: "Loop",
+    init: opts.init,
+    body: opts.body,
+    update: opts.update,
+  };
 }
 
 export interface Break {
@@ -168,7 +199,9 @@ export function isBreak(s: Stmt): s is Break {
 }
 
 function createBreak(): Break {
-  return { kind: "Break" };
+  return {
+    kind: "Break",
+  };
 }
 
 export interface Continue {
@@ -180,7 +213,9 @@ export function isContinue(s: Stmt): s is Continue {
 }
 
 function createContinue(): Continue {
-  return { kind: "Continue" };
+  return {
+    kind: "Continue",
+  };
 }
 
 export interface Return {
@@ -193,7 +228,10 @@ export function isReturn(s: Stmt): s is Return {
 }
 
 function createReturn(value?: Expr): Return {
-  return { kind: "Return", value };
+  return {
+    kind: "Return",
+    value,
+  };
 }
 
 export interface ExprStmt {
@@ -206,7 +244,10 @@ export function isExprStmt(s: Stmt): s is ExprStmt {
 }
 
 function createExprStmt(expr: Expr): ExprStmt {
-  return { kind: "ExprStmt", expr };
+  return {
+    kind: "ExprStmt",
+    expr,
+  };
 }
 
 export interface Assign {
@@ -220,7 +261,11 @@ export function isAssign(s: Stmt): s is Assign {
 }
 
 function createAssign(target: Expr, value: Expr): Assign {
-  return { kind: "Assign", target, value };
+  return {
+    kind: "Assign",
+    target,
+    value,
+  };
 }
 
 // ── Patterns ────────────────────────────────────────────────────────────────
@@ -235,7 +280,10 @@ export function isArrPat(node: { kind: string }): node is ArrPat {
 }
 
 function createArrPat(elements: ArrPatElem[]): ArrPat {
-  return { kind: "ArrPat", elements };
+  return {
+    kind: "ArrPat",
+    elements,
+  };
 }
 
 export interface ArrPatElem {
@@ -248,7 +296,10 @@ export function isArrPatElem(node: { kind: string }): node is ArrPatElem {
 }
 
 function createArrPatElem(name: string): ArrPatElem {
-  return { kind: "ArrPatElem", name };
+  return {
+    kind: "ArrPatElem",
+    name,
+  };
 }
 
 export type ArrayPattern = ArrPat;
@@ -267,7 +318,7 @@ export type Expr =
   | Arithmetic
   | Comparison
   | UnaryExpression
-  | EsLogicalNot
+  | LogicalNot
   | EsTruthy
   | EsEquality
   | EsLogicalExpression
@@ -276,9 +327,11 @@ export type Expr =
   | PropertyAccess
   | EsArrayLength
   | EsConditional
-  | ArrowFun
+  | Function
   | EsIndex
-  | ElementAccess;
+  | ElementAccess
+  | EsObjectLiteral
+  | EsGlobal;
 
 export interface NumericLiteral {
   kind: "NumericLiteral";
@@ -290,7 +343,10 @@ export function isNumericLiteral(e: Expr): e is NumericLiteral {
 }
 
 function createNumericLiteral(value: number): NumericLiteral {
-  return { kind: "NumericLiteral", value };
+  return {
+    kind: "NumericLiteral",
+    value,
+  };
 }
 
 export interface StringLiteral {
@@ -303,7 +359,10 @@ export function isStringLiteral(e: Expr): e is StringLiteral {
 }
 
 function createStringLiteral(value: string): StringLiteral {
-  return { kind: "StringLiteral", value };
+  return {
+    kind: "StringLiteral",
+    value,
+  };
 }
 
 export interface BooleanLiteral {
@@ -316,7 +375,10 @@ export function isBooleanLiteral(e: Expr): e is BooleanLiteral {
 }
 
 function createBooleanLiteral(value: boolean): BooleanLiteral {
-  return { kind: "BooleanLiteral", value };
+  return {
+    kind: "BooleanLiteral",
+    value,
+  };
 }
 
 export interface NullLiteral {
@@ -328,7 +390,9 @@ export function isNullLiteral(e: Expr): e is NullLiteral {
 }
 
 function createNullLiteral(): NullLiteral {
-  return { kind: "NullLiteral" };
+  return {
+    kind: "NullLiteral",
+  };
 }
 
 export interface Identifier {
@@ -341,7 +405,10 @@ export function isIdentifier(e: Expr): e is Identifier {
 }
 
 function createIdentifier(name: string): Identifier {
-  return { kind: "Identifier", name };
+  return {
+    kind: "Identifier",
+    name,
+  };
 }
 
 // `+` split by type-resolved dispatch: build pass picks NumericAdd vs
@@ -357,7 +424,11 @@ export function isEsNumericAdd(e: Expr): e is EsNumericAdd {
 }
 
 function createEsNumericAdd(left: Expr, right: Expr): EsNumericAdd {
-  return { kind: "es.NumericAdd", left, right };
+  return {
+    kind: "es.NumericAdd",
+    left,
+    right,
+  };
 }
 
 export interface EsStringConcat {
@@ -371,7 +442,11 @@ export function isEsStringConcat(e: Expr): e is EsStringConcat {
 }
 
 function createEsStringConcat(left: Expr, right: Expr): EsStringConcat {
-  return { kind: "es.StringConcat", left, right };
+  return {
+    kind: "es.StringConcat",
+    left,
+    right,
+  };
 }
 
 // DIV-MOD-001: `%` follows Lua's sign-of-divisor, not ES's sign-of-dividend.
@@ -386,12 +461,13 @@ export function isArithmetic(e: Expr): e is Arithmetic {
   return e.kind === "Arithmetic";
 }
 
-function createArithmetic(
-  op: Arithmetic["op"],
-  left: Expr,
-  right: Expr,
-): Arithmetic {
-  return { kind: "Arithmetic", op, left, right };
+function createArithmetic(op: Arithmetic["op"], left: Expr, right: Expr): Arithmetic {
+  return {
+    kind: "Arithmetic",
+    op,
+    left,
+    right,
+  };
 }
 
 export interface Comparison {
@@ -405,12 +481,13 @@ export function isComparison(e: Expr): e is Comparison {
   return e.kind === "Comparison";
 }
 
-function createComparison(
-  op: Comparison["op"],
-  left: Expr,
-  right: Expr,
-): Comparison {
-  return { kind: "Comparison", op, left, right };
+function createComparison(op: Comparison["op"], left: Expr, right: Expr): Comparison {
+  return {
+    kind: "Comparison",
+    op,
+    left,
+    right,
+  };
 }
 
 export interface UnaryExpression {
@@ -424,20 +501,27 @@ export function isUnaryExpression(e: Expr): e is UnaryExpression {
 }
 
 function createUnaryExpression(op: "-", operand: Expr): UnaryExpression {
-  return { kind: "UnaryExpression", op, operand };
+  return {
+    kind: "UnaryExpression",
+    op,
+    operand,
+  };
 }
 
-export interface EsLogicalNot {
-  kind: "es.LogicalNot";
+export interface LogicalNot {
+  kind: "LogicalNot";
   operand: Expr;
 }
 
-export function isEsLogicalNot(e: Expr): e is EsLogicalNot {
-  return e.kind === "es.LogicalNot";
+export function isLogicalNot(e: Expr): e is LogicalNot {
+  return e.kind === "LogicalNot";
 }
 
-function createEsLogicalNot(operand: Expr): EsLogicalNot {
-  return { kind: "es.LogicalNot", operand };
+function createLogicalNot(operand: Expr): LogicalNot {
+  return {
+    kind: "LogicalNot",
+    operand,
+  };
 }
 
 // DIV-TRUTH-001: marks "consumed for truthiness." ES truthiness is wider
@@ -452,7 +536,10 @@ export function isEsTruthy(e: Expr): e is EsTruthy {
 }
 
 function createEsTruthy(expr: Expr): EsTruthy {
-  return { kind: "es.Truthy", expr };
+  return {
+    kind: "es.Truthy",
+    expr,
+  };
 }
 
 export interface EsEquality {
@@ -500,7 +587,67 @@ function createEsLogicalExpression(
   left: Expr,
   right: Expr,
 ): EsLogicalExpression {
-  return { kind: "es.LogicalExpression", op, left, right };
+  return {
+    kind: "es.LogicalExpression",
+    op,
+    left,
+    right,
+  };
+}
+
+// Call-argument spread (`f(...arr)`). Lowering is per-target: `table.unpack`
+// on Lua 5.0, bare `...` on 5.1+ when forwarding function varargs directly,
+// lualib helpers for mid-list spread, or refusal (roblox-ts forbids non-final
+// position). Not yet wired into `Call.args`; lives alongside until the build
+// pass migrates.
+export interface Spread {
+  kind: "Spread";
+  expr: Expr;
+}
+
+export function isSpread(node: { kind: string }): node is Spread {
+  return node.kind === "Spread";
+}
+
+function createSpread(expr: Expr): Spread {
+  return {
+    kind: "Spread",
+    expr,
+  };
+}
+
+// `this` reference inside a function body. Resolution depends on the
+// containing `Function.shape`: arrow → captured outer `this`; expr/decl →
+// dynamic receiver (Lua `self`, host-specific binding, or a refusal).
+export interface EsThis {
+  kind: "es.This";
+}
+
+export function isEsThis(e: { kind: string }): e is EsThis {
+  return e.kind === "es.This";
+}
+
+function createEsThis(): EsThis {
+  return {
+    kind: "es.This",
+  };
+}
+
+// `arguments` pseudo-variable. Most backends refuse (roblox-ts does); a
+// faithful one would polyfill from rest-params. Kept as a node so the
+// refusal fires at the lowering layer, not at build.
+export interface EsArguments {
+  kind: "es.Arguments";
+}
+
+export function isEsArguments(e: { kind: string }): e is EsArguments {
+  return e.kind === "es.Arguments";
+}
+
+function createEsArguments(): EsArguments {
+  return {
+    kind: "es.Arguments",
+  };
 }
 
 export interface Call {
@@ -514,7 +661,11 @@ export function isCall(e: Expr): e is Call {
 }
 
 function createCall(callee: Expr, args: Expr[]): Call {
-  return { kind: "Call", callee, args };
+  return {
+    kind: "Call",
+    callee,
+    args,
+  };
 }
 
 export interface ArrayLit {
@@ -527,7 +678,10 @@ export function isArrayLit(e: Expr): e is ArrayLit {
 }
 
 function createArrayLit(elements: Expr[]): ArrayLit {
-  return { kind: "ArrayLit", elements };
+  return {
+    kind: "ArrayLit",
+    elements,
+  };
 }
 
 export interface PropertyAccess {
@@ -541,7 +695,11 @@ export function isPropertyAccess(e: Expr): e is PropertyAccess {
 }
 
 function createPropertyAccess(receiver: Expr, name: string): PropertyAccess {
-  return { kind: "PropertyAccess", receiver, name };
+  return {
+    kind: "PropertyAccess",
+    receiver,
+    name,
+  };
 }
 
 export interface EsArrayLength {
@@ -554,7 +712,10 @@ export function isEsArrayLength(e: Expr): e is EsArrayLength {
 }
 
 function createEsArrayLength(array: Expr): EsArrayLength {
-  return { kind: "es.ArrayLength", array };
+  return {
+    kind: "es.ArrayLength",
+    array,
+  };
 }
 
 export interface EsConditional {
@@ -568,28 +729,50 @@ export function isEsConditional(e: Expr): e is EsConditional {
   return e.kind === "es.Conditional";
 }
 
-function createEsConditional(
-  cond: Expr,
-  whenTrue: Expr,
-  whenFalse: Expr,
-): EsConditional {
-  return { kind: "es.Conditional", cond, whenTrue, whenFalse };
+function createEsConditional(cond: Expr, whenTrue: Expr, whenFalse: Expr): EsConditional {
+  return {
+    kind: "es.Conditional",
+    cond,
+    whenTrue,
+    whenFalse,
+  };
 }
 
-// `body` is normalized to a statement list; concise bodies become a Return
-// at build time so the backend only sees one shape.
-export interface ArrowFun {
-  kind: "ArrowFun";
+// Unified function literal. `shape` distinguishes the three ES surface forms
+// because they differ in two ways the backend cares about:
+//   - `this` binding: arrow captures lexically; expr/decl bind dynamically.
+//   - hoisting + name-in-scope: only `decl` hoists to the enclosing function;
+//     `expr` may have a name that's in scope only inside its own body.
+// Body is normalized to a statement list at build time (concise arrow bodies
+// become a single Return) so backends see one shape.
+//
+// Not yet wired into the Expr / Stmt unions: `ArrowFun` and `FunDecl` remain
+// the live shapes until the build/lower pass migrates.
+export interface Function {
+  kind: "Function";
+  shape: "decl" | "expr" | "arrow";
+  name?: string;
   params: Parameter[];
   body: Stmt[];
 }
 
-export function isArrowFun(e: Expr): e is ArrowFun {
-  return e.kind === "ArrowFun";
+export function isFunction(node: { kind: string }): node is Function {
+  return node.kind === "Function";
 }
 
-function createArrowFun(params: Parameter[], body: Stmt[]): ArrowFun {
-  return { kind: "ArrowFun", params, body };
+function createFunction(opts: {
+  shape: Function["shape"];
+  name?: string;
+  params: Parameter[];
+  body: Stmt[];
+}): Function {
+  return {
+    kind: "Function",
+    shape: opts.shape,
+    name: opts.name,
+    params: opts.params,
+    body: opts.body,
+  };
 }
 
 // DIV-ARR-INDEX-001: 0-based ES index; backend handles the 0→1 adjustment.
@@ -604,7 +787,11 @@ export function isEsIndex(e: Expr): e is EsIndex {
 }
 
 function createEsIndex(array: Expr, index: Expr): EsIndex {
-  return { kind: "es.Index", array, index };
+  return {
+    kind: "es.Index",
+    array,
+    index,
+  };
 }
 
 export interface ElementAccess {
@@ -618,7 +805,61 @@ export function isElementAccess(e: Expr): e is ElementAccess {
 }
 
 function createElementAccess(receiver: Expr, index: Expr): ElementAccess {
-  return { kind: "ElementAccess", receiver, index };
+  return {
+    kind: "ElementAccess",
+    receiver,
+    index,
+  };
+}
+
+// Identifier resolved (via the type checker's symbol table) to a binding in
+// the ambient lib, not to user code. Carries the binding name; the per-target
+// lowering pattern-matches on it. Generic on purpose: adding a new ambient
+// global is a lib + lowering change, not an IR change. Build attaches this
+// node only when the symbol lookup confirms the lib binding (so user-shadowed
+// `const NaN = 1` keeps the user binding as a regular Identifier).
+export interface EsGlobal {
+  kind: "es.Global";
+  name: string;
+}
+
+export function isEsGlobal(e: Expr): e is EsGlobal {
+  return e.kind === "es.Global";
+}
+
+function createEsGlobal(name: string): EsGlobal {
+  return {
+    kind: "es.Global",
+    name,
+  };
+}
+
+// Object literal. ES leak: spread enumerates own-enumerable string keys at
+// runtime, computed keys evaluate left-to-right interleaved with values, and
+// numeric/string-literal keys ES-coerce to strings (Lua keeps them distinct).
+// Shorthand and method-shorthand are desugared at build into kv members
+// (shorthand → kv with Identifier value; method → kv with Function value).
+// Getters/setters are refused at build; not in the IR vocabulary.
+export type ObjectKey = { kind: "static"; name: string } | { kind: "computed"; expr: Expr };
+
+export type ObjectMember =
+  | { kind: "kv"; key: ObjectKey; value: Expr }
+  | { kind: "spread"; value: Expr };
+
+export interface EsObjectLiteral {
+  kind: "es.ObjectLiteral";
+  members: ObjectMember[];
+}
+
+export function isEsObjectLiteral(e: Expr): e is EsObjectLiteral {
+  return e.kind === "es.ObjectLiteral";
+}
+
+function createEsObjectLiteral(members: ObjectMember[]): EsObjectLiteral {
+  return {
+    kind: "es.ObjectLiteral",
+    members,
+  };
 }
 
 // All `createXxx` functions are reachable only through this namespace so
@@ -648,7 +889,7 @@ export const ir = {
   createArithmetic,
   createComparison,
   createUnaryExpression,
-  createEsLogicalNot,
+  createLogicalNot,
   createEsTruthy,
   createEsEquality,
   createEsLogicalExpression,
@@ -657,7 +898,12 @@ export const ir = {
   createPropertyAccess,
   createEsArrayLength,
   createEsConditional,
-  createArrowFun,
   createEsIndex,
   createElementAccess,
+  createFunction,
+  createSpread,
+  createEsThis,
+  createEsArguments,
+  createEsObjectLiteral,
+  createEsGlobal,
 } as const;

@@ -1,0 +1,21 @@
+(Module
+  [
+    (VarDecl :kind let :name n :init 1)
+    (Assign :target n :value (es.NumericAdd n 2))
+    (Assign :target n :value (Arith :op - n 1))
+    (Assign :target n :value (Arith :op * n 3))
+    (Assign :target n :value (Arith :op / n 2))
+    (Assign :target n :value (Arith :op % n 5))
+    (Assign :target n :value (Arith :op ** n 2))
+    (VarDecl :kind let :name s :init "hi")
+    (Assign :target s :value (es.StringConcat s " there"))
+    (FunDecl
+      :name asExpression
+      :params []
+      :body [
+              (VarDecl :kind let :name i :init 0)
+              (Assign :target i :value (es.NumericAdd i 5))
+              (VarDecl :kind const :name r :init i)
+              (Return (es.NumericAdd r i))
+            ])
+  ])

@@ -1,0 +1,12 @@
+(Module
+  [
+    (VarDecl :kind const :name arr :init (ArrayLit [1 2 3]))
+    (Destructure
+      :kind const
+      :pattern (ArrPat [(ArrPatElem :name a) (ArrPatElem :name b)])
+      :init arr)
+    (Destructure
+      :kind const
+      :pattern (ArrPat [(ArrPatElem :name c) (ArrPatElem :name d)])
+      :init (ArrayLit [10 20]))
+  ])

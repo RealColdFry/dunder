@@ -1,0 +1,23 @@
+(Module
+  [
+    (FunDecl
+      :exported true
+      :name classify
+      :params [input]
+      :body [
+              (If
+                :cond (es.Equality :strict true input 0)
+                :then [(Return 0)]
+                :else [
+                        (If
+                          :cond (es.Equality :strict true input 1)
+                          :then [(Return 1)]
+                          :else [
+                                  (If
+                                    :cond (es.Equality :strict true input 2)
+                                    :then [(Return 2)]
+                                    :else [(Return 3)])
+                                ])
+                      ])
+            ])
+  ])

@@ -1,0 +1,4 @@
+[
+  "tstl/this-conversion.ts(6,35): error D201000: Unable to convert function with a 'this' parameter to function with no 'this'.\n  help: Wrap in an arrow function, or annotate the target with 'this: void'.",
+  "tstl/this-conversion.ts(11,37): error D201001: Unable to convert function with no 'this' parameter to function with 'this'.\n  help: Wrap in an arrow function, or annotate the target with 'this: any'."
+]

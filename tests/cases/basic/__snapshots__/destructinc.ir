@@ -1,0 +1,21 @@
+(Module
+  [
+    (VarDecl :kind const :name arr :init (ArrayLit [1 2]))
+    (VarDecl :kind let :name i :init 0)
+    (VarDecl :kind let :name %arr_index_0 :init (es.Index :array arr :index i))
+    (Assign :target i :value (es.NumericAdd i 1))
+    (Destructure
+      :kind let
+      :pattern (ArrPat [(ArrPatElem :name v1) (ArrPatElem :name v2)])
+      :init (ArrayLit [%arr_index_0 (es.Index :array arr :index i)]))
+    (VarDecl :kind let :name %arr_index_1 :init (es.Index :array arr :index i))
+    (Assign :target i :value (Arith :op - i 1))
+    (Destructure
+      :kind let
+      :pattern (ArrPat [(ArrPatElem :name v3) (ArrPatElem :name v4)])
+      :init (ArrayLit [%arr_index_1 (es.Index :array arr :index i)]))
+    (VarDecl
+      :kind const
+      :name sum
+      :init (es.NumericAdd (es.NumericAdd (es.NumericAdd v1 v2) v3) v4))
+  ])

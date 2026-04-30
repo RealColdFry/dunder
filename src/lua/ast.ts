@@ -132,7 +132,9 @@ export type BinaryOperator =
 
 export type Operator = UnaryOperator | BinaryOperator;
 
-export type SymbolId = number & { _symbolIdBrand: any };
+export type SymbolId = number & {
+  _symbolIdBrand: any;
+};
 
 export enum NodeFlags {
   None = 0,
@@ -152,11 +154,16 @@ export interface Node extends TextRange {
 }
 
 export function createNode(kind: SyntaxKind, _tsOriginal?: unknown): Node {
-  return { kind, flags: NodeFlags.None };
+  return {
+    kind,
+    flags: NodeFlags.None,
+  };
 }
 
 export function cloneNode<T extends Node>(node: T): T {
-  return { ...node };
+  return {
+    ...node,
+  };
 }
 
 export function setNodePosition<T extends Node>(node: T, position: TextRange): T {
@@ -166,7 +173,10 @@ export function setNodePosition<T extends Node>(node: T, position: TextRange): T
 }
 
 export function getOriginalPos(node: Node): TextRange {
-  return { line: node.line, column: node.column };
+  return {
+    line: node.line,
+    column: node.column,
+  };
 }
 
 export function setNodeFlags<T extends Node>(node: T, flags: NodeFlags): T {
@@ -846,7 +856,13 @@ export function isFunctionDefinition(
 }
 
 export type InlineFunctionExpression = FunctionExpression & {
-  body: { statements: [ReturnStatement & { expressions: Expression[] }] };
+  body: {
+    statements: [
+      ReturnStatement & {
+        expressions: Expression[];
+      },
+    ];
+  };
 };
 
 export function isInlineFunctionExpression(

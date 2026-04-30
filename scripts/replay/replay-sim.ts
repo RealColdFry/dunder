@@ -23,7 +23,12 @@ import { resolve as resolvePath } from "node:path";
 import { isCallable } from "./replay-shared.ts";
 
 interface NodeArg {
-  node: { kind: string; pos: number; end: number; file?: string };
+  node: {
+    kind: string;
+    pos: number;
+    end: number;
+    file?: string;
+  };
 }
 interface RefArg {
   ref: number;
@@ -110,7 +115,13 @@ interface Stats {
   // Earliest layer at which a given resultSeq becomes available.
   availableAt: Map<number, number>;
   unsupportedMethods: Map<string, number>;
-  batchedPerLayer: Map<number, { methods: Set<string>; calls: number }>;
+  batchedPerLayer: Map<
+    number,
+    {
+      methods: Set<string>;
+      calls: number;
+    }
+  >;
   maxLayer: number;
 }
 
@@ -194,7 +205,10 @@ function fold(s: Stats, e: Entry): void {
 
   let bl = s.batchedPerLayer.get(layer);
   if (!bl) {
-    bl = { methods: new Set(), calls: 0 };
+    bl = {
+      methods: new Set(),
+      calls: 0,
+    };
     s.batchedPerLayer.set(layer, bl);
   }
   bl.methods.add(e.method);
@@ -202,8 +216,13 @@ function fold(s: Stats, e: Entry): void {
 }
 
 async function streamLog(path: string, onEntry: (e: Entry) => void): Promise<void> {
-  const stream = createReadStream(path, { encoding: "utf8" });
-  const rl = createInterface({ input: stream, crlfDelay: Infinity });
+  const stream = createReadStream(path, {
+    encoding: "utf8",
+  });
+  const rl = createInterface({
+    input: stream,
+    crlfDelay: Infinity,
+  });
   let lineNo = 0;
   let progressTick = 0;
   const PROGRESS_EVERY = 100_000;

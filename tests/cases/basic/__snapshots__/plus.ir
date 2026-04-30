@@ -1,0 +1,13 @@
+(Module
+  [
+    (FunDecl
+      :exported true
+      :name addNumbers
+      :params [a b]
+      :body [(Return (es.NumericAdd a b))])
+    (FunDecl
+      :exported true
+      :name concatStrings
+      :params [a b]
+      :body [(Return (es.StringConcat a b))])
+  ])

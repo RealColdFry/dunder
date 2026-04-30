@@ -1,0 +1,19 @@
+(Module
+  [
+    (FunDecl
+      :name makeCounter
+      :params []
+      :body [
+              (VarDecl :kind let :name count :init 0)
+              (Return
+                (ArrowFun
+                  :params []
+                  :body [
+                          (Assign :target count :value (es.NumericAdd count 1))
+                          (Return count)
+                        ]))
+            ])
+    (VarDecl :kind const :name inc :init (Call :callee makeCounter :args []))
+    (ExprStmt (Call :callee inc :args []))
+    (ExprStmt (Call :callee inc :args []))
+  ])

@@ -1,0 +1,4 @@
+[
+  "basic/short-circuit-effects.ts(4,10): error TS2365: Operator '+' cannot be applied to types 'number | boolean' and 'number'.",
+  "basic/short-circuit-effects.ts(10,10): error TS2365: Operator '+' cannot be applied to types 'number | boolean' and 'number'."
+]

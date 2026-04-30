@@ -1,0 +1,17 @@
+(Module
+  [
+    (FunDecl
+      :name sumTo
+      :params [n]
+      :body [
+              (VarDecl :kind let :name total :init 0)
+              (Loop
+                :init [(VarDecl :kind let :name i :init 0)]
+                :body [
+                        (If :cond (LogicalNot (Cmp :op < i n)) :then [(Break)])
+                        (Assign :target total :value (es.NumericAdd total i))
+                      ]
+                :update [(Assign :target i :value (es.NumericAdd i 1))])
+              (Return total)
+            ])
+  ])
